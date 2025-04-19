@@ -1,0 +1,1 @@
+# smart_shop_manager
