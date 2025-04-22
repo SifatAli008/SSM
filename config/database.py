@@ -76,3 +76,4 @@ class FirebaseDB:
             return []
 
         return collection.where(field, operator, value).stream()
+    
