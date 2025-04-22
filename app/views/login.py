@@ -1,11 +1,14 @@
 import sys
-from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QLineEdit, QPushButton, QMessageBox,
-                             QFrame, QSizePolicy, QCheckBox)
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout,
+    QLabel, QLineEdit, QPushButton, QMessageBox,
+    QFrame, QCheckBox
+)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
 from controllers.auth_controller import AuthController
+from views.main_window import MainWindow
 
 
 class LoginWindow(QWidget):
@@ -60,6 +63,7 @@ class LoginWindow(QWidget):
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(16)
 
+        # Title
         title = QLabel('Smart Shop Manager')
         title.setFont(QFont('Segoe UI', 22, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
@@ -75,13 +79,16 @@ class LoginWindow(QWidget):
         line.setStyleSheet("color: #ccc;")
         layout.addWidget(line)
 
+        # Form layout
         form_layout = QVBoxLayout()
         form_layout.setSpacing(12)
 
+        # Username
         username_label = QLabel("Username")
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Enter your username")
 
+        # Password
         password_label = QLabel("Password")
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Enter your password")
@@ -92,17 +99,20 @@ class LoginWindow(QWidget):
         form_layout.addWidget(password_label)
         form_layout.addWidget(self.password_input)
 
+        # Remember Me + Forgot Password
         remember_forgot_layout = QHBoxLayout()
         self.remember_me = QCheckBox("Remember me")
         self.forgot_password = QPushButton("Forgot password?")
         self.forgot_password.setObjectName('adminLink')
         self.forgot_password.setFlat(True)
         self.forgot_password.setCursor(Qt.PointingHandCursor)
+
         remember_forgot_layout.addWidget(self.remember_me)
         remember_forgot_layout.addStretch()
         remember_forgot_layout.addWidget(self.forgot_password)
         form_layout.addLayout(remember_forgot_layout)
 
+        # Role Selection
         role_label = QLabel("Login as:")
         role_label.setFont(QFont('Segoe UI', 11))
         form_layout.addWidget(role_label)
@@ -121,6 +131,7 @@ class LoginWindow(QWidget):
         roles_layout.addWidget(self.cashier_button)
         form_layout.addLayout(roles_layout)
 
+        # Login button
         self.login_button = QPushButton("LOGIN")
         self.login_button.setObjectName("loginButton")
         self.login_button.setCursor(Qt.PointingHandCursor)
@@ -129,6 +140,7 @@ class LoginWindow(QWidget):
 
         layout.addLayout(form_layout)
 
+        # Footer
         footer = QHBoxLayout()
         footer.addStretch()
         footer_label = QLabel("Need help? Contact the ")
@@ -136,11 +148,13 @@ class LoginWindow(QWidget):
         self.admin_link.setObjectName("adminLink")
         self.admin_link.setFlat(True)
         self.admin_link.setCursor(Qt.PointingHandCursor)
+
         footer.addWidget(footer_label)
         footer.addWidget(self.admin_link)
         footer.addStretch()
         layout.addLayout(footer)
 
+        # Events
         self.setLayout(layout)
         self.username_input.setFocus()
         self.username_input.returnPressed.connect(lambda: self.password_input.setFocus())
@@ -211,9 +225,13 @@ class LoginWindow(QWidget):
         self.login_button.setEnabled(True)
 
     def open_appropriate_window(self, user):
-        print(f"Opening {user.role} Dashboard for {user.full_name}")
-        # Placeholder - Replace with actual dashboard logic
-        # self.close()
+        self.main_window = MainWindow(user)
+        self.main_window.logout_requested.connect(self.show_again)
+        self.main_window.show()
+        self.close()
+
+    def show_again(self):
+        self.show()
 
     def contact_admin(self):
         QMessageBox.information(self, 'Contact Administrator',
