@@ -4,8 +4,8 @@ from config.settings import COLLECTION_INVENTORY
 
 class InventoryItem:
     def __init__(self, item_id=None, name=None, description=None, category=None,
-                 quantity=0, cost_price=0.0, selling_price=0.0, 
-                 reorder_level=10, expiry_date=None, supplier_id=None):
+                quantity=0, cost_price=0.0, selling_price=0.0, 
+                reorder_level=10, expiry_date=None, supplier_id=None):
         self.item_id = item_id
         self.name = name
         self.description = description

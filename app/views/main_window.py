@@ -1,5 +1,3 @@
-# File: views/main_window.py
-
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QStackedWidget, QFrame
@@ -8,7 +6,8 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
 from controllers.inventory_controller import InventoryController
-from views.dashboard_view import DashboardPage  # Dashboard page class
+from views.dashboard_view import DashboardPage
+from views.inventory_view import InventoryView
 
 
 class MainWindow(QMainWindow):
@@ -18,32 +17,30 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.current_user = user
         self.inventory_controller = InventoryController()
-        self.nav_buttons = []
 
+        if not hasattr(self.inventory_controller, 'model'):
+            raise AttributeError("InventoryController was not initialized correctly. Check if the database is open.")
+
+        self.nav_buttons = []
         self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle('Smart Shop Manager')
         self.setMinimumSize(1000, 600)
 
-        # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        # Main layout
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Sidebar
         sidebar = self.create_sidebar()
         main_layout.addWidget(sidebar, 1)
 
-        # Content area
         self.content_stack = QStackedWidget()
         main_layout.addWidget(self.content_stack, 4)
 
-        # Add content pages
         self.add_dashboard_page()
         self.add_inventory_page()
         self.add_sales_page()
@@ -51,7 +48,6 @@ class MainWindow(QMainWindow):
         self.add_suppliers_page()
         self.add_reports_page()
 
-        # Default page
         self.content_stack.setCurrentIndex(0)
 
     def create_sidebar(self):
@@ -82,14 +78,12 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Title
         title = QLabel("Smart Shop\nManager")
         title.setFont(QFont("Arial", 16, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("padding: 20px; color: white;")
         layout.addWidget(title)
 
-        # Nav buttons
         self.create_nav_button(layout, "Dashboard", 0)
         self.create_nav_button(layout, "Inventory", 1)
         self.create_nav_button(layout, "Sales", 2)
@@ -99,12 +93,10 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
 
-        # User info
         user_info = QFrame()
         user_layout = QVBoxLayout(user_info)
         user_name = QLabel(f"{self.current_user.full_name}")
         user_role = QLabel(f"Role: {self.current_user.role.capitalize()}")
-
         user_name.setStyleSheet("color: white; font-weight: bold;")
         user_role.setStyleSheet("color: #bdc3c7; font-size: 12px;")
 
@@ -112,7 +104,6 @@ class MainWindow(QMainWindow):
         user_layout.addWidget(user_role)
         layout.addWidget(user_info)
 
-        # Logout button
         logout_btn = QPushButton("Logout")
         logout_btn.setStyleSheet("""
             QPushButton {
@@ -143,11 +134,9 @@ class MainWindow(QMainWindow):
     def change_page(self, index):
         for btn in self.nav_buttons:
             btn.setChecked(False)
-
         sender = self.sender()
         if sender:
             sender.setChecked(True)
-
         self.content_stack.setCurrentIndex(index)
 
     def add_dashboard_page(self):
@@ -155,47 +144,34 @@ class MainWindow(QMainWindow):
         self.content_stack.addWidget(dashboard)
 
     def add_inventory_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        title = QLabel("Inventory Management")
-        title.setFont(QFont("Arial", 24))
-        layout.addWidget(title)
-        layout.addWidget(QLabel("Inventory tools will be here..."))
-        self.content_stack.addWidget(page)
+        inventory_view = InventoryView(self.inventory_controller)
+        self.content_stack.addWidget(inventory_view)
 
     def add_sales_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        title = QLabel("Sales & Billing")
-        title.setFont(QFont("Arial", 24))
-        layout.addWidget(title)
+        layout.addWidget(QLabel("Sales & Billing", font=QFont("Arial", 24)))
         layout.addWidget(QLabel("Sales interface goes here..."))
         self.content_stack.addWidget(page)
 
     def add_customers_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        title = QLabel("Customer Management")
-        title.setFont(QFont("Arial", 24))
-        layout.addWidget(title)
+        layout.addWidget(QLabel("Customer Management", font=QFont("Arial", 24)))
         layout.addWidget(QLabel("Customer records shown here..."))
         self.content_stack.addWidget(page)
 
     def add_suppliers_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        title = QLabel("Supplier Management")
-        title.setFont(QFont("Arial", 24))
-        layout.addWidget(title)
+        layout.addWidget(QLabel("Supplier Management", font=QFont("Arial", 24)))
         layout.addWidget(QLabel("Supplier list will be added here..."))
         self.content_stack.addWidget(page)
 
     def add_reports_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        title = QLabel("Reports & Analytics")
-        title.setFont(QFont("Arial", 24))
-        layout.addWidget(title)
+        layout.addWidget(QLabel("Reports & Analytics", font=QFont("Arial", 24)))
         layout.addWidget(QLabel("Reports dashboard coming soon..."))
         self.content_stack.addWidget(page)
 

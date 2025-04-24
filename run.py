@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QApplication
 base_dir = Path(__file__).resolve().parent / 'app'
 sys.path.append(str(base_dir))
 
-# Import modules after fixing the path
+# Import necessary modules after fixing the path
 from config.database import FirebaseDB
 from app.controllers.auth_controller import AuthController
 from config.settings import DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_FULL_NAME
@@ -25,13 +25,13 @@ def initialize_database():
     try:
         db = FirebaseDB()
         if db.db is not None:
-            print("Database initialized successfully.")
+            print("✅ Database initialized successfully.")
             return True
         else:
-            print("Database connection returned None.")
+            print("❌ Database connection returned None.")
             return False
     except Exception as e:
-        print(f"Database initialization failed: {e}")
+        print(f"❌ Database initialization failed: {e}")
         return False
 
 def create_initial_admin():
@@ -49,7 +49,7 @@ def create_initial_admin():
         else:
             print("Admin user already exists or creation failed.")
     except Exception as e:
-        print(f"Error while creating initial admin: {e}")
+        print(f"❌ Error while creating initial admin: {e}")
 
 def launch_app():
     """Start the PyQt application."""
@@ -61,14 +61,19 @@ def launch_app():
 def main():
     """Main application entry point."""
     print("Launching Smart Shop Manager...")
-    
+
+    # Step 1: Set up the environment (folders)
     setup_environment()
 
+    # Step 2: Initialize the database (Firebase)
     if not initialize_database():
         print("❌ Failed to connect to database. Exiting...")
         return
 
+    # Step 3: Create initial admin user (if not already created)
     create_initial_admin()
+
+    # Step 4: Launch the PyQt application
     launch_app()
 
 if __name__ == "__main__":
