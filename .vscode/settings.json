@@ -1,6 +1,0 @@
-{
-    "python.analysis.extraPaths": [
-        "./smart_shop_manager/app",
-        "./app"
-    ]
-}
