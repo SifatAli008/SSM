@@ -2,14 +2,17 @@ from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QFont
 
+
 class ActionButton(QPushButton):
     def __init__(self, text, icon=None, color="#2ecc71", radius=8):
         super().__init__(text)
         self.setCursor(Qt.PointingHandCursor)
 
+
         # Set icon if provided
         if icon:
             self.setIcon(QIcon(icon))
+
 
         # Set base styles
         self.setFont(QFont("Segoe UI", 10, QFont.Bold))
@@ -29,3 +32,6 @@ class ActionButton(QPushButton):
                 background-color: #1e8449;
             }}
         """)
+
+
+

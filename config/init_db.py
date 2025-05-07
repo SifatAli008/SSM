@@ -15,9 +15,12 @@ def create_db():
         CREATE TABLE IF NOT EXISTS inventory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
+            details TEXT,
+            category TEXT DEFAULT 'Other',
             stock INTEGER DEFAULT 0,
             buying_price REAL DEFAULT 0.0,
-            selling_price REAL DEFAULT 0.0
+            selling_price REAL DEFAULT 0.0,
+            last_updated TEXT
         )
     ''')
 
