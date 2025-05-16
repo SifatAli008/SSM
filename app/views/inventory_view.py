@@ -2,11 +2,79 @@ from PyQt5.QtWidgets import (
     QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
     QGroupBox, QLineEdit, QSizePolicy, QDialog, QFormLayout, QMessageBox,
     QTableView, QHeaderView, QAbstractItemView, QComboBox, QFileDialog,
-    QCheckBox, QSpacerItem, QFrame, QToolButton, QApplication, QStyledItemDelegate
+    QCheckBox, QSpacerItem, QFrame, QToolButton, QApplication, QStyledItemDelegate,
+    QItemDelegate
 )
 from PyQt5.QtCore import Qt, QTimer, QDateTime, QSortFilterProxyModel, pyqtSlot, QSize
 from PyQt5.QtGui import QFont, QIntValidator, QDoubleValidator, QIcon, QColor
+from app.views.widgets.components import Button  # Import our standardized Button component
 
+# Custom delegate for displaying checkboxes in the table
+class CheckBoxDelegate(QItemDelegate):
+    def createEditor(self, parent, option, index):
+        checkbox = QCheckBox(parent)
+        checkbox.setStyleSheet("QCheckBox { margin-left: 15px; }")
+        return checkbox
+    
+    def setEditorData(self, editor, index):
+        value = index.model().data(index, Qt.EditRole)
+        if value:
+            editor.setChecked(True)
+        else:
+            editor.setChecked(False)
+    
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.isChecked(), Qt.EditRole)
+    
+    def paint(self, painter, option, index):
+        # Draw a checkbox
+        checked = index.model().data(index, Qt.DisplayRole)
+        checkbox = QCheckBox()
+        if checked:
+            checkbox.setChecked(True)
+        
+        # Center the checkbox in the cell
+        checkbox.setGeometry(option.rect)
+        if option.state & QItemDelegate.State_Selected:
+            painter.fillRect(option.rect, option.palette.highlight())
+            
+        # Calculate position for checkbox
+        x = option.rect.x() + (option.rect.width() - checkbox.sizeHint().width()) // 2
+        y = option.rect.y() + (option.rect.height() - checkbox.sizeHint().height()) // 2
+        
+        # Save painter state
+        painter.save()
+        # Move painter to the position
+        painter.translate(x, y)
+        # Draw the checkbox
+        checkbox.render(painter)
+        # Restore painter state
+        painter.restore()
+
+# Custom delegate for the Product Details column with text field
+class DetailsDelegate(QStyledItemDelegate):
+    def createEditor(self, parent, option, index):
+        editor = QLineEdit(parent)
+        editor.setStyleSheet("""
+            QLineEdit {
+                border: 1px solid #bbb;
+                border-radius: 3px;
+                padding: 5px;
+                background-color: white;
+            }
+        """)
+        return editor
+    
+    def setEditorData(self, editor, index):
+        value = index.model().data(index, Qt.EditRole)
+        if value:
+            editor.setText(str(value))
+    
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.text(), Qt.EditRole)
+    
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect)
 
 class InventoryView(QWidget):
     def __init__(self, controller=None, user_role="Admin"):
@@ -26,7 +94,7 @@ class InventoryView(QWidget):
     def init_ui(self):
         self.setWindowTitle("Smart Shop Manager - Inventory")
         self.setGeometry(100, 100, 1300, 900)
-        self.setStyleSheet("""
+        self.setStyleSheet('''
             QWidget {
                 font-family: 'Segoe UI';
                 font-size: 14px;
@@ -62,8 +130,23 @@ class InventoryView(QWidget):
                 font-weight: bold;
                 color: white;
             }
-            QPushButton:hover {
-                background-color: #333;
+            QPushButton#add {
+                background-color: #3498db;
+            }
+            QPushButton#add:hover {
+                background-color: #2980b9;
+            }
+            QPushButton#update {
+                background-color: #f39c12;
+            }
+            QPushButton#update:hover {
+                background-color: #e67e22;
+            }
+            QPushButton#delete {
+                background-color: #e74c3c;
+            }
+            QPushButton#delete:hover {
+                background-color: #c0392b;
             }
             QPushButton:disabled {
                 background-color: #cccccc;
@@ -101,12 +184,9 @@ class InventoryView(QWidget):
                 font-size: 12px;
                 color: #7f8c8d;
             }
-        """)
+        ''')
 
         main_layout = QVBoxLayout()
-
-        # Header
-        main_layout.addLayout(self.build_header())
 
         # Cards Row - improved to match dashboard style
         self.create_info_cards(main_layout)
@@ -114,50 +194,9 @@ class InventoryView(QWidget):
         # Table and Actions Area
         main_layout.addLayout(self.create_table_section())
 
-        # Footer
-        self.footer_label = QLabel()
-        self.footer_label.setStyleSheet("background-color: #F7F7F7; padding: 6px; font-style: italic;")
-        self.update_footer_time()
-        main_layout.addWidget(self.footer_label)
-
-        timer = QTimer(self)
-        timer.timeout.connect(self.update_footer_time)
-        timer.start(60000)  # Update every minute
-
         self.setLayout(main_layout)
         self.setup_model()
         self.refresh_from_controller()
-
-    def build_header(self):
-        header = QHBoxLayout()
-        header.setSpacing(12)
-
-        title_label = QLabel("Inventory Management")
-        title_label.setFont(QFont("Segoe UI", 18, QFont.Bold))
-        title_label.setStyleSheet("color: #2c3e50;")
-        header.addWidget(title_label)
-        
-        header.addStretch()
-
-        for text, color, icon in [("🔔 Notifications", "#3498db", "bell"), 
-                                  ("👤 Admin", "#2ecc71", "user"), 
-                                  ("🔴 Logout", "#e74c3c", "power")]:
-            btn = QPushButton(text)
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {color};
-                    color: white;
-                    border: none;
-                    border-radius: 6px;
-                    padding: 8px 16px;
-                }}
-                QPushButton:hover {{
-                    background-color: #333;
-                }}
-            """)
-            header.addWidget(btn)
-
-        return header
 
     def create_info_cards(self, parent_layout):
         cards_layout = QHBoxLayout()
@@ -199,120 +238,173 @@ class InventoryView(QWidget):
 
     def create_table_section(self):
         table_section = QVBoxLayout()
+        table_section.setContentsMargins(10, 10, 10, 10)
         
-        # Search and filter bar - enhanced
-        search_frame = QFrame()
-        search_frame.setObjectName("cardFrame")
-        search_layout = QVBoxLayout(search_frame)
-        
-        search_title = QLabel("Search & Filter Products")
-        search_title.setObjectName("cardTitle")
-        search_layout.addWidget(search_title)
-        
-        search_controls = QHBoxLayout()
-        
-        self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText("🔍 Search by product name or details...")
-        self.search_bar.textChanged.connect(self.filter_inventory)
-        
-        self.category_filter = QComboBox()
-        self.category_filter.addItems(["All Categories", "Electronics", "Food", "Clothing", "Other"])
-        self.category_filter.currentIndexChanged.connect(self.filter_inventory)
-        
-        self.price_range = QComboBox()
-        self.price_range.addItems(["All Prices", "Under $10", "$10-$50", "$50-$100", "Over $100"])
-        self.price_range.currentIndexChanged.connect(self.filter_inventory)
-        
-        search_controls.addWidget(QLabel("Search:"))
-        search_controls.addWidget(self.search_bar, 3)
-        search_controls.addWidget(QLabel("Category:"))
-        search_controls.addWidget(self.category_filter, 1)
-        search_controls.addWidget(QLabel("Price:"))
-        search_controls.addWidget(self.price_range, 1)
-        
-        search_layout.addLayout(search_controls)
-        table_section.addWidget(search_frame)
-        
-        # Inventory Table - now with multi-select
+        # Main container frame with clean white background
         table_frame = QFrame()
         table_frame.setObjectName("cardFrame")
+        table_frame.setStyleSheet("""
+            #cardFrame {
+                background-color: white;
+                border: 1px solid #dcdcdc;
+                border-radius: 6px;
+            }
+        """)
         table_layout = QVBoxLayout(table_frame)
-        
-        table_header = QHBoxLayout()
-        table_title = QLabel("Product Inventory")
-        table_title.setObjectName("cardTitle")
-        table_header.addWidget(table_title)
-        
-        self.item_count_label = QLabel("0 items")
-        self.item_count_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        table_header.addWidget(self.item_count_label, 1)
-        
-        table_layout.addLayout(table_header)
-        
-        # Create the table
+        table_layout.setContentsMargins(0, 0, 0, 0)  # Remove internal padding
+
+        # Search and Filter Row
+        search_filter_layout = QHBoxLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍 Search Bar")
+        self.search_input.textChanged.connect(self.apply_filters)
+        search_filter_layout.addWidget(self.search_input)
+
+        self.category_filter = QComboBox()
+        self.category_filter.addItems(["All", "Electronics", "Food", "Clothing", "Other"])
+        self.category_filter.currentIndexChanged.connect(self.apply_filters)
+        search_filter_layout.addWidget(self.category_filter)
+
+        self.price_filter = QLineEdit()
+        self.price_filter.setPlaceholderText("Price Filter")
+        self.price_filter.setValidator(QDoubleValidator(0.0, 999999.99, 2))
+        self.price_filter.textChanged.connect(self.apply_filters)
+        search_filter_layout.addWidget(self.price_filter)
+
+        table_layout.addLayout(search_filter_layout)
+
+        # Create the table with improved styling
         self.table_view = QTableView()
         self.table_view.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table_view.setSelectionMode(QAbstractItemView.ExtendedSelection)  # Allow multi-select
+        self.table_view.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table_view.setAlternatingRowColors(True)
-        self.table_view.setSortingEnabled(True)
-        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table_view.setShowGrid(True)
+        self.table_view.setGridStyle(Qt.SolidLine)
+        self.table_view.verticalHeader().setVisible(True)  # Show row numbers
+        self.table_view.verticalHeader().setDefaultSectionSize(40)  # Set row height
+        
+        # Style the vertical header (row numbers) to match reference
+        self.table_view.verticalHeader().setStyleSheet("""
+            QHeaderView::section {
+                background-color: #f0f0f0;
+                padding: 5px;
+                border: 1px solid #dcdcdc;
+                font-size: 12px;
+            }
+        """)
+        
         self.table_view.clicked.connect(self.on_table_clicked)
+        self.table_view.setStyleSheet("""
+            QTableView {
+                border: none;
+                background-color: white;
+                alternate-background-color: #f8f8f8;
+                gridline-color: #e0e0e0;
+            }
+            QTableView::item {
+                border-bottom: 1px solid #e0e0e0;
+                padding: 5px;
+                font-size: 14px;
+            }
+            QTableView::item:selected {
+                background-color: #e7f4ff;
+                color: #2c3e50;
+            }
+            QHeaderView::section {
+                background-color: #f0f0f0;
+                color: #333;
+                font-weight: bold;
+                padding: 10px 5px;
+                border: 1px solid #dcdcdc;
+                border-top: 0px;
+                border-left: 0px;
+                border-right: 1px solid #dcdcdc;
+                font-size: 14px;
+            }
+            QHeaderView::section:first {
+                border-left: 1px solid #dcdcdc;
+            }
+            QHeaderView {
+                background-color: #f0f0f0;
+            }
+            QHeaderView::down-arrow, QHeaderView::up-arrow {
+                subcontrol-position: center right;
+            }
+            QTableView QLineEdit {
+                border: 1px solid #bbb;
+                padding: 5px;
+                background-color: white;
+            }
+        """)
         
         table_layout.addWidget(self.table_view)
         
-        # Action Buttons
-        buttons_layout = QHBoxLayout()
+        # Bottom action buttons container
+        button_container = QFrame()
+        button_container.setStyleSheet("""
+            background-color: #f5f5f5;
+            border-top: 1px solid #dcdcdc;
+        """)
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(15, 15, 15, 15)
         
-        self.add_button = QPushButton("➕ Add Product")
-        self.add_button.setStyleSheet("background-color: #27ae60;")
+        # Add button
+        self.add_button = Button("Add", variant="primary")
         
-        self.edit_button = QPushButton("✏️ Edit Product")
-        self.edit_button.setStyleSheet("background-color: #3498db;")
+        # Edit and Delete buttons
+        self.edit_button = Button("Update", variant="warning")
         
-        self.delete_button = QPushButton("🗑️ Delete Selected")
-        self.delete_button.setStyleSheet("background-color: #e74c3c;")
+        self.delete_button = Button("Delete", variant="danger")
         
-        self.upload_button = QPushButton("📥 Bulk Upload")
-        self.upload_button.setStyleSheet("background-color: #9b59b6;")
+        # Export button
+        self.export_button = Button("Export CSV", variant="primary")
         
-        self.export_button = QPushButton("📤 Export CSV")
-        self.export_button.setStyleSheet("background-color: #f39c12;")
+        # Layout the buttons exactly as in the reference
+        button_layout.addWidget(self.add_button)
+        button_layout.addSpacerItem(QSpacerItem(30, 10, QSizePolicy.Fixed, QSizePolicy.Minimum))
         
-        buttons_layout.addWidget(self.add_button)
-        buttons_layout.addWidget(self.edit_button)
-        buttons_layout.addWidget(self.delete_button)
-        buttons_layout.addWidget(self.upload_button)
-        buttons_layout.addWidget(self.export_button)
+        # Add action buttons in the center
+        button_layout.addWidget(self.edit_button)
+        button_layout.addSpacerItem(QSpacerItem(10, 10, QSizePolicy.Fixed, QSizePolicy.Minimum))
+        button_layout.addWidget(self.delete_button)
+        button_layout.addSpacerItem(QSpacerItem(10, 10, QSizePolicy.Fixed, QSizePolicy.Minimum))
+        
+        # Add export button to layout
+        button_layout.addWidget(self.export_button)
+        
+        # Push refresh button to the right
+        button_layout.addStretch(1)
         
         # Connect buttons to actions
         self.add_button.clicked.connect(self.show_add_dialog)
         self.edit_button.clicked.connect(self.show_edit_dialog)
         self.delete_button.clicked.connect(self.delete_products)
-        self.upload_button.clicked.connect(self.show_upload_dialog)
         self.export_button.clicked.connect(self.export_to_csv)
         
         # Initially disable edit/delete buttons until row is selected
         self.edit_button.setEnabled(False)
         self.delete_button.setEnabled(False)
         
-        table_layout.addLayout(buttons_layout)
+        table_layout.addWidget(button_container)
         table_section.addWidget(table_frame)
         
         return table_section
 
-    def update_footer_time(self):
-        self.footer_label.setText(f"Last synced: {QDateTime.currentDateTime().toString('hh:mm ap - dd MMM yyyy')}")
-
     def update_stock_info(self, stock, low_stock, recent, total_value=0):
-        self.card_labels["stock"]["value"].setText(f"{stock:,}")
-        self.card_labels["low"]["value"].setText(f"{low_stock}")
-        self.card_labels["recent"]["value"].setText(f"{recent}")
-        self.card_labels["value"]["value"].setText(f"${total_value:,.2f}")
+        # Update card values if they exist
+        if hasattr(self, 'card_labels') and self.card_labels:
+            if 'stock' in self.card_labels:
+                self.card_labels["stock"]["value"].setText(f"{stock:,}")
+            if 'low' in self.card_labels:
+                self.card_labels["low"]["value"].setText(f"{low_stock}")
+            if 'recent' in self.card_labels:
+                self.card_labels["recent"]["value"].setText(f"{recent}")
+            if 'value' in self.card_labels:
+                self.card_labels["value"]["value"].setText(f"${total_value:,.2f}")
         
-        # Update item count label
-        row_count = self.table_view.model().rowCount() if self.table_view.model() else 0
-        self.item_count_label.setText(f"{row_count} items in inventory")
+        # Refresh the table view
+        if hasattr(self, 'table_view') and self.table_view.model():
+            self.table_view.model().layoutChanged.emit()
 
     def setup_model(self):
         if self.controller and hasattr(self.controller, 'model'):
@@ -326,33 +418,46 @@ class InventoryView(QWidget):
             
             self.table_view.setModel(self.proxy_model)
             
-            # Hide only the ID column
-            self.table_view.hideColumn(0)
-            for col in range(1, 7):
-                self.table_view.showColumn(col)
-            # Set column headers for clarity
-            headers = [
-                "Product Name", "Product Details", "Category", "Quantity", "Buying Price ($)", "Selling Price ($)"
-            ]
-            for i, header in enumerate(headers, start=1):
-                self.table_view.model().setHeaderData(i, Qt.Horizontal, header)
-            # Set better column widths and minimum widths
-            self.table_view.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)  # Product Name
-            self.table_view.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)  # Product Details
-            self.table_view.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Category
-            self.table_view.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Quantity
-            self.table_view.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Buying Price
-            self.table_view.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Selling Price
-            # Set minimum widths for readability
-            self.table_view.setColumnWidth(1, 180)  # Product Name
-            self.table_view.setColumnWidth(2, 220)  # Product Details
-            self.table_view.setColumnWidth(3, 120)  # Category
-            self.table_view.setColumnWidth(4, 100)  # Quantity
-            self.table_view.setColumnWidth(5, 120)  # Buying Price
-            self.table_view.setColumnWidth(6, 120)  # Selling Price
-            self.table_view.horizontalHeader().setDefaultSectionSize(120)
+            # Hide ID column and other unnecessary columns, keep only what's in the reference
+            for col in range(self.table_view.model().columnCount()):
+                self.table_view.hideColumn(col)
+            
+            # Show only relevant columns
+            column_mapping = {
+                0: 0,  # Vertical header will be used for row numbers
+                1: 0,  # ID/Serial Number 
+                2: 1,  # Product Name
+                3: 2,  # Product Details
+                4: 3,  # Product Quantity
+            }
+            
+            # Show the necessary columns
+            for model_col, view_col in column_mapping.items():
+                if model_col < self.table_view.model().columnCount():
+                    self.table_view.showColumn(model_col)
+            
+            # Set column headers to match reference image
+            headers = ["Serial Number", "Product Name", "Product Details", "Product Quantity"]
+            for i, header in enumerate(headers):
+                self.table_view.model().setHeaderData(i+1, Qt.Horizontal, header)
+            
+            # Make the "Product Details" column editable with custom delegate
+            details_delegate = DetailsDelegate(self.table_view)
+            self.table_view.setItemDelegateForColumn(3, details_delegate)  # Index 3 is Product Details
+            
+            # Enable editing mode for the table
+            self.table_view.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed)
+            
+            # Set column widths to match reference image
+            self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+            self.table_view.setColumnWidth(1, 180)  # Serial Number
+            self.table_view.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)  # Product Name
+            self.table_view.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)  # Product Details
+            self.table_view.setColumnWidth(4, 150)  # Product Quantity
+            
             # Connect selection model signals after model is set up
             self.table_view.selectionModel().selectionChanged.connect(self.on_selection_changed)
+            
             # Refresh model and proxy to ensure data is shown
             self.controller.model.select()
             self.proxy_model.invalidate()
@@ -365,6 +470,10 @@ class InventoryView(QWidget):
             recent = self.controller.count_recent_items()
             total_value = self.controller.calculate_inventory_value()
             self.update_stock_info(stock, low, recent, total_value)
+            
+            # Reset any proxy model filtering 
+            if hasattr(self, 'proxy_model'):
+                self.proxy_model.setFilterFixedString("")
 
     def on_table_clicked(self, index):
         self.selected_row = self.proxy_model.mapToSource(index).row()
@@ -372,65 +481,17 @@ class InventoryView(QWidget):
         self.delete_button.setEnabled(True)
 
     def on_selection_changed(self, selected, deselected):
-        self.selected_rows = []
-        for index in self.table_view.selectionModel().selectedRows():
-            source_row = self.proxy_model.mapToSource(index).row()
-            self.selected_rows.append(source_row)
-        
-        # Enable or disable buttons based on selection
-        has_selection = len(self.selected_rows) > 0
-        self.delete_button.setEnabled(has_selection)
-        
-        # Edit button is only enabled when exactly one row is selected
-        self.edit_button.setEnabled(len(self.selected_rows) == 1)
-        if len(self.selected_rows) == 1:
-            self.selected_row = self.selected_rows[0]
-
-    def filter_inventory(self):
-        search_text = self.search_bar.text().lower()
-        category = self.category_filter.currentText()
-        price_range = self.price_range.currentText()
-        
-        # Create a filter for the proxy model
-        self.proxy_model.setFilterFixedString(search_text)
-        
-        # Apply additional filters through the controller
-        filter_query = ""
-        
-        # Category filter
-        if category != "All Categories":
-            filter_query += f" AND category = '{category}'"
-        
-        # Price range filter
-        if price_range == "Under $10":
-            filter_query += " AND selling_price < 10"
-        elif price_range == "$10-$50":
-            filter_query += " AND selling_price >= 10 AND selling_price <= 50"
-        elif price_range == "$50-$100":
-            filter_query += " AND selling_price > 50 AND selling_price <= 100" 
-        elif price_range == "Over $100":
-            filter_query += " AND selling_price > 100"
-        
-        # Apply filter to the source model
-        if filter_query:
-            if search_text:
-                # Combine text search with other filters
-                self.controller.model.setFilter(f"LOWER(name) LIKE '%{search_text}%'{filter_query}")
-            else:
-                # Just apply the other filters
-                self.controller.model.setFilter(filter_query.lstrip(" AND"))
+        indices = self.table_view.selectionModel().selectedRows()
+        if indices:
+            # Get the selected row's source model index
+            index = self.proxy_model.mapToSource(indices[0])
+            self.selected_row = index.row()
+            self.edit_button.setEnabled(True)
+            self.delete_button.setEnabled(True)
         else:
-            # Reset to just text search or no filter
-            if search_text:
-                self.controller.model.setFilter(f"LOWER(name) LIKE '%{search_text}%'")
-            else:
-                self.controller.model.setFilter("")
-        
-        self.controller.model.select()
-        
-        # Update the item count
-        row_count = self.table_view.model().rowCount()
-        self.item_count_label.setText(f"{row_count} items in inventory")
+            self.selected_row = -1
+            self.edit_button.setEnabled(False)
+            self.delete_button.setEnabled(False)
 
     def show_add_dialog(self):
         dialog = ProductDialog(self, "Add New Product")
@@ -438,13 +499,18 @@ class InventoryView(QWidget):
             name = dialog.name_input.text()
             details = dialog.details_input.toPlainText()
             category = dialog.category_input.currentText()
-            stock = int(dialog.qty_input.text())
-            buying_price = float(dialog.buying_price_input.text())
-            selling_price = float(dialog.selling_price_input.text())
             
-            if self.controller:
+            try:
+                stock = int(dialog.qty_input.text())
+                buying_price = float(dialog.buying_price_input.text())
+                selling_price = float(dialog.selling_price_input.text())
+            except ValueError:
+                QMessageBox.warning(self, "Invalid Input", "Please enter valid numbers for quantity and prices.")
+                return
+            
+            if self.controller and hasattr(self.controller, 'add_product'):
                 # Add the product with all details
-                self.controller.add_product(
+                success = self.controller.add_product(
                     name, 
                     stock, 
                     buying_price, 
@@ -452,23 +518,61 @@ class InventoryView(QWidget):
                     details=details, 
                     category=category
                 )
-                self.refresh_from_controller()
-                QMessageBox.information(self, "Success", f"Product '{name}' added successfully!")
+                
+                if success:
+                    self.refresh_from_controller()
+                    QMessageBox.information(self, "Success", f"Product '{name}' added successfully!")
+                else:
+                    QMessageBox.critical(self, "Error", "Failed to add product. Please try again.")
+            else:
+                QMessageBox.warning(self, "Not Implemented", "Add functionality is not available.")
 
     def show_edit_dialog(self):
-        if not self.selected_rows or len(self.selected_rows) != 1:
-            QMessageBox.warning(self, "No Selection", "Please select a single product to edit.")
+        if self.selected_row < 0:
+            QMessageBox.warning(self, "No Selection", "Please select a product to edit.")
             return
             
-        # Get current values from the model
-        name = self.controller.model.data(self.controller.model.index(self.selected_row, 1))
-        stock = self.controller.model.data(self.controller.model.index(self.selected_row, 4))
-        buying_price = self.controller.model.data(self.controller.model.index(self.selected_row, 5))
-        selling_price = self.controller.model.data(self.controller.model.index(self.selected_row, 6))
+        # Get current values from the model using the updated column mapping
+        id_col = 1  # Serial Number (ID column)
+        name_col = 2  # Product Name
+        details_col = 3  # Product Details
+        stock_col = 4  # Product Quantity
         
-        # Get additional fields if they exist in your database
-        details = self.controller.get_product_details(self.selected_row)
-        category = self.controller.get_product_category(self.selected_row)
+        # Get data from model
+        product_id = self.controller.model.data(self.controller.model.index(self.selected_row, id_col))
+        name = self.controller.model.data(self.controller.model.index(self.selected_row, name_col))
+        details = self.controller.model.data(self.controller.model.index(self.selected_row, details_col))
+        stock = self.controller.model.data(self.controller.model.index(self.selected_row, stock_col))
+        
+        # Get additional fields if they exist in the database
+        # The controller methods return the actual values, not dictionaries
+        buying_price = 0.0
+        selling_price = 0.0
+        category = "Other"
+        
+        # Get buying price from column 5 (if available)
+        if self.controller.model.columnCount() > 5:
+            buying_price_val = self.controller.model.data(self.controller.model.index(self.selected_row, 5))
+            if buying_price_val is not None:
+                try:
+                    buying_price = float(buying_price_val)
+                except (ValueError, TypeError):
+                    pass
+        
+        # Get selling price from column 6 (if available)
+        if self.controller.model.columnCount() > 6:
+            selling_price_val = self.controller.model.data(self.controller.model.index(self.selected_row, 6))
+            if selling_price_val is not None:
+                try:
+                    selling_price = float(selling_price_val)
+                except (ValueError, TypeError):
+                    pass
+        
+        # Get category from column 3 (category field)
+        if self.controller.model.columnCount() > 3:
+            category_val = self.controller.model.data(self.controller.model.index(self.selected_row, 3))
+            if category_val is not None:
+                category = str(category_val)
         
         dialog = ProductDialog(
             self, 
@@ -482,82 +586,58 @@ class InventoryView(QWidget):
         )
         
         if dialog.exec_():
-            # Prepare updated data
+            # Prepare updated data with correct column indices
             updated_data = {
-                1: dialog.name_input.text(),
-                4: int(dialog.qty_input.text()),
-                5: float(dialog.buying_price_input.text()),
-                6: float(dialog.selling_price_input.text())
+                name_col: dialog.name_input.text(),
+                details_col: dialog.details_input.toPlainText(),
+                stock_col: int(dialog.qty_input.text())
             }
             
             # Add additional fields to the update
             additional_data = {
-                "details": dialog.details_input.toPlainText(),
+                "buying_price": float(dialog.buying_price_input.text()),
+                "selling_price": float(dialog.selling_price_input.text()),
                 "category": dialog.category_input.currentText()
             }
             
             # Update the product
-            self.controller.update_item(self.selected_row, updated_data, additional_data)
-            self.refresh_from_controller()
-            QMessageBox.information(self, "Success", f"Product updated successfully!")
+            if hasattr(self.controller, 'update_item'):
+                success = self.controller.update_item(self.selected_row, updated_data, additional_data)
+                if success:
+                    self.refresh_from_controller()
+                    QMessageBox.information(self, "Success", f"Product updated successfully!")
+                else:
+                    QMessageBox.critical(self, "Error", "Failed to update product. Please try again.")
+            else:
+                QMessageBox.warning(self, "Not Implemented", "Update functionality is not available.")
 
     def delete_products(self):
-        if not self.selected_rows:
-            QMessageBox.warning(self, "No Selection", "Please select at least one product to delete.")
+        if self.selected_row < 0:
+            QMessageBox.warning(self, "No Selection", "Please select a product to delete.")
             return
         
-        # Get product names for confirmation message
-        product_names = []
-        for row in self.selected_rows:
-            name = self.controller.model.data(self.controller.model.index(row, 1))
-            product_names.append(name)
-        
-        product_list = "\n".join(product_names[:5])
-        if len(product_names) > 5:
-            product_list += f"\n... and {len(product_names) - 5} more"
+        # Get product name for confirmation message
+        product_name = self.controller.model.data(self.controller.model.index(self.selected_row, 2))
         
         # Ask for confirmation
         confirm = QMessageBox.question(
             self, 
             "Confirm Deletion", 
-            f"Are you sure you want to delete the following products?\n\n{product_list}",
+            f"Are you sure you want to delete product '{product_name}'?",
             QMessageBox.Yes | QMessageBox.No, 
             QMessageBox.No
         )
         
         if confirm == QMessageBox.Yes:
-            deleted_count = self.controller.delete_multiple_items(self.selected_rows)
-            self.selected_row = -1
-            self.selected_rows = []
-            self.edit_button.setEnabled(False)
-            self.delete_button.setEnabled(False)
-            self.refresh_from_controller()
-            QMessageBox.information(self, "Success", f"{deleted_count} products deleted successfully!")
-
-    def show_upload_dialog(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, 
-            "Select CSV File for Bulk Upload", 
-            "", 
-            "CSV Files (*.csv)"
-        )
-        
-        if file_path:
-            confirm = QMessageBox.question(
-                self,
-                "Confirm Upload",
-                f"Are you sure you want to upload data from:\n{file_path}?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
-            )
-            
-            if confirm == QMessageBox.Yes:
-                try:
-                    success, added, errors = self.controller.upload_bulk_stock(file_path)
-                    self.refresh_from_controller()
-                    QMessageBox.information(self, "Success", f"Bulk upload completed successfully!\n{added} products added, {errors} errors encountered.")
-                except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Upload failed: {str(e)}")
+            success = self.controller.delete_item(self.selected_row)
+            if success:
+                self.selected_row = -1
+                self.edit_button.setEnabled(False)
+                self.delete_button.setEnabled(False)
+                self.refresh_from_controller()
+                QMessageBox.information(self, "Success", f"Product '{product_name}' deleted successfully!")
+            else:
+                QMessageBox.critical(self, "Error", "Failed to delete product. Please try again.")
 
     def export_to_csv(self):
         file_path, _ = QFileDialog.getSaveFileName(
@@ -577,6 +657,28 @@ class InventoryView(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Export failed: {str(e)}")
 
+    def apply_filters(self):
+        search_text = self.search_input.text().lower()
+        category = self.category_filter.currentText()
+        price_text = self.price_filter.text()
+        price = float(price_text) if price_text else None
+
+        filter_string = ""
+
+        if search_text:
+            filter_string += f"name LIKE '%{search_text}%'"
+
+        if category != "All":
+            if filter_string:
+                filter_string += " AND "
+            filter_string += f"category = '{category}'"
+
+        if price is not None:
+            if filter_string:
+                filter_string += " AND "
+            filter_string += f"selling_price <= {price}"
+
+        self.proxy_model.setFilterFixedString(filter_string)
 
 class ProductDialog(QDialog):
     def __init__(self, parent=None, title="Product", name="", qty=0, buying_price=0.0, selling_price=0.0, details="", category="Electronics"):
@@ -610,12 +712,22 @@ class ProductDialog(QDialog):
         self.details_input.setText(str(details) if details is not None else "")
         self.details_input.setMaximumHeight(100)
         
+        # Get all categories and add "Add New Category" option
         self.category_input = QComboBox()
-        self.category_input.addItems(["Electronics", "Food", "Clothing", "Other"])
-        if category is not None:
+        categories = ["Electronics", "Food", "Clothing", "Other", "--- Add New Category ---"]
+        self.category_input.addItems(categories)
+        self.category_input.currentIndexChanged.connect(self.handle_category_change)
+        
+        # Set current category if provided
+        if category is not None and category.strip():
+            # Check if category exists in dropdown
             index = self.category_input.findText(str(category))
             if index >= 0:
                 self.category_input.setCurrentIndex(index)
+            else:
+                # If it's a custom category not in the list, add it
+                self.category_input.insertItem(len(categories) - 1, category)
+                self.category_input.setCurrentText(category)
         
         self.qty_input = QLineEdit(str(qty))
         self.qty_input.setValidator(QIntValidator(0, 999999))
@@ -658,34 +770,8 @@ class ProductDialog(QDialog):
         # Buttons
         buttons_layout = QHBoxLayout()
         
-        self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #95a5a6;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 10px 20px;
-            }
-            QPushButton:hover {
-                background-color: #7f8c8d;
-            }
-        """)
-        
-        self.save_btn = QPushButton("Save")
-        self.save_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #27ae60;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 10px 20px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #219653;
-            }
-        """)
+        self.cancel_btn = Button("Cancel", variant="secondary")
+        self.save_btn = Button("Save", variant="success")
         
         buttons_layout.addWidget(self.cancel_btn)
         buttons_layout.addWidget(self.save_btn)
@@ -696,6 +782,28 @@ class ProductDialog(QDialog):
         # Connect signals
         self.save_btn.clicked.connect(self.validate_and_accept)
         self.cancel_btn.clicked.connect(self.reject)
+    
+    def handle_category_change(self, index):
+        """Handle selection of 'Add New Category' option"""
+        if self.category_input.currentText() == "--- Add New Category ---":
+            # Prompt user to enter new category
+            from PyQt5.QtWidgets import QInputDialog
+            new_category, ok = QInputDialog.getText(
+                self, 
+                "Add New Category", 
+                "Enter new category name:",
+                QLineEdit.Normal, 
+                ""
+            )
+            
+            if ok and new_category.strip():
+                # Add the new category before the "Add New Category" option
+                self.category_input.insertItem(self.category_input.count() - 1, new_category)
+                # Select the new category
+                self.category_input.setCurrentText(new_category)
+            else:
+                # User canceled or entered empty text, revert to first category
+                self.category_input.setCurrentIndex(0)
         
     def validate_and_accept(self):
         # Basic validation
@@ -732,6 +840,11 @@ class ProductDialog(QDialog):
                 raise ValueError
         except Exception:
             QMessageBox.warning(self, "Validation Error", "Selling price must be a positive number!")
+            return
+            
+        # Check if "Add New Category" is selected
+        if self.category_input.currentText() == "--- Add New Category ---":
+            QMessageBox.warning(self, "Validation Error", "Please select a valid category or add a new one!")
             return
             
         self.accept()
