@@ -2,60 +2,75 @@ import sys
 import os
 from pathlib import Path
 from PyQt5.QtWidgets import QApplication
+import traceback
 
-# Fixing the import path
-base_dir = Path(__file__).resolve().parent / 'app'
-sys.path.append(str(base_dir))
+# Add the current directory to path
+current_dir = Path(__file__).resolve().parent
+sys.path.append(str(current_dir))
 
-# Import necessary modules after fixing the path
-from config.database import FirebaseDB
-from app.controllers.auth_controller import AuthController
-from config.settings import DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_FULL_NAME
-from app.views.login import LoginWindow
+print("Starting Smart Shop Manager...")
+
+try:
+    # Import necessary modules after fixing the path
+    from app.views.login import LoginWindow
+    from app.utils.database import DatabaseManager
+    from config.init_db import create_db
+    from app.utils.theme_manager import ThemeManager, ThemeType
+    print("Modules imported successfully")
+except Exception as e:
+    print(f"Error importing modules: {e}")
+    traceback.print_exc()
+    sys.exit(1)
 
 def setup_environment():
     """Create necessary folders and prepare environment."""
-    required_dirs = ['backups', 'reports']
+    print("Setting up environment...")
+    required_dirs = ['backups', 'reports', 'logs', 'data']
     for directory in required_dirs:
         os.makedirs(directory, exist_ok=True)
+    
+    # Create icon directory if it doesn't exist
+    os.makedirs("app/assets/icons", exist_ok=True)
+    
     print("Environment setup completed.")
 
 def initialize_database():
-    """Try to connect to Firebase database."""
+    """Set up the SQLite database."""
+    print("Initializing database...")
     try:
-        db = FirebaseDB()
-        if db.db is not None:
+        # Create or ensure the database exists
+        create_db()
+        
+        # Test the database connection
+        db = DatabaseManager.get_qt_connection()
+        if db and db.isOpen():
             print("✅ Database initialized successfully.")
             return True
         else:
-            print("❌ Database connection returned None.")
+            print("❌ Database connection failed.")
             return False
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
+        traceback.print_exc()
         return False
-
-def create_initial_admin():
-    """Attempt to create default admin if not already exists."""
-    try:
-        auth_controller = AuthController()
-        result = auth_controller.create_initial_admin(
-            username=DEFAULT_ADMIN_USERNAME,
-            password=DEFAULT_ADMIN_PASSWORD,
-            full_name=DEFAULT_ADMIN_FULL_NAME
-        )
-        if result:
-            print(f"[✔] Admin user created: {DEFAULT_ADMIN_USERNAME}")
-            print("⚠️  Please change the default password after first login.")
-        else:
-            print("Admin user already exists or creation failed.")
-    except Exception as e:
-        print(f"❌ Error while creating initial admin: {e}")
 
 def launch_app():
     """Start the PyQt application."""
+    print("Launching application UI...")
     app = QApplication(sys.argv)
+    
+    # Apply theme before creating any windows
+    ThemeManager.apply_theme(ThemeType.LIGHT)
+    
     login_window = LoginWindow()
+    
+    # Automatically fill admin credentials for testing
+    login_window.username_input.setText("admin")
+    login_window.password_input.setText("adminPass123")
+    login_window.set_role_selection("admin")
+    
     login_window.show()
+    print("Application window displayed")
     sys.exit(app.exec_())
 
 def main():
@@ -65,16 +80,16 @@ def main():
     # Step 1: Set up the environment (folders)
     setup_environment()
 
-    # Step 2: Initialize the database (Firebase)
+    # Step 2: Initialize the database (SQLite)
     if not initialize_database():
-        print("❌ Failed to connect to database. Exiting...")
-        return
-
-    # Step 3: Create initial admin user (if not already created)
-    create_initial_admin()
-
-    # Step 4: Launch the PyQt application
+        print("❌ Failed to connect to database. Will try to continue anyway...")
+    
+    # Step 3: Launch the PyQt application
     launch_app()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"ERROR: {e}")
+        traceback.print_exc()

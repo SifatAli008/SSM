@@ -67,3 +67,4 @@ FEATURE_ACCESS = {
     "settings": [ROLE_ADMIN],
     "backup": [ROLE_ADMIN]
 }
+

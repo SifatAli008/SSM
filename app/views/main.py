@@ -1,16 +1,25 @@
 # main.py
 import sys
-from PyQt5.QtWidgets import QApplication
-from models.users import User
-from views.main_window import MainWindow
-from config.sqlite_db import init_sqlite_connection  # 👈 import it
+import os
+from pathlib import Path
+
+# Add the parent directory to sys.path
+base_dir = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(base_dir))
+
+from PyQt5.QtWidgets import QApplication, QMessageBox
+from app.models.users import User
+from app.views.main_window import MainWindow
+from app.utils.database import DatabaseManager
 
 def main():
     app = QApplication(sys.argv)
 
     # ✅ Initialize the SQLite connection before anything else
-    db = init_sqlite_connection()
+    db = DatabaseManager.get_qt_connection()
     if not db or not db.isOpen():
+        QMessageBox.critical(None, "Database Error", 
+                           "Failed to connect to the database. The application will now exit.")
         print("⚠️ Exiting app — Database failed to open.")
         return
 

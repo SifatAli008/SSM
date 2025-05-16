@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel
+from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QGraphicsDropShadowEffect
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor, QPalette
 
@@ -15,6 +15,13 @@ class Graph(QFrame):
             palette.setColor(QPalette.Window, QColor(color))
             self.setAutoFillBackground(True)
             self.setPalette(palette)
+            
+        # Add drop shadow effect instead of CSS box-shadow
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(8)
+        shadow.setColor(QColor(0, 0, 0, 30))
+        shadow.setOffset(0, 2)
+        self.setGraphicsEffect(shadow)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -86,7 +93,6 @@ class Graph(QFrame):
             }
             QFrame#graphCard:hover {
                 border: 1px solid #3498db;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
             }
             QLabel#graphTitle {
                 color: #2c3e50;

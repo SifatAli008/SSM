@@ -6,14 +6,22 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QDateTime, QPropertyAnimation, QEasingCurve, QSize
 from PyQt5.QtGui import QFont, QIcon, QColor
 
+# Import controllers
+from app.controllers.inventory_controller import InventoryController
 
-from controllers.inventory_controller import InventoryController
-from views.dashboard_view import DashboardPage
-from views.inventory_view import InventoryView
+# Import views
+from app.views.dashboard_view import DashboardPage
+from app.views.inventory_view import InventoryView
+from app.views.sales_view import SalesView
+from app.views.customer_view import CustomerView
+from app.views.reports_view import ReportsView
 
+# Import components
+from app.views.widgets.components import Sidebar, Button, Card, PageHeader
+from app.views.widgets.layouts import PageLayout
+from app.utils.theme_manager import ThemeManager, ThemeType
 
-
-
+# Keep the AlertWidget for now - we'll refactor it later
 class AlertWidget(QWidget):
     """Enhanced alert widget with dismiss button and animations"""
     closed = pyqtSignal()
@@ -114,29 +122,24 @@ class AlertWidget(QWidget):
         self.animation.start()
 
 
-
-
 class MainWindow(QMainWindow):
     logout_requested = pyqtSignal()
     back_requested = pyqtSignal()
 
-
     def __init__(self, user):
         super().__init__()
+        
+        # Initialize properties
         self.current_user = user
         self.inventory_controller = InventoryController()
         self.previous_page_index = 0
-        self.setup_animations()
-
-
-        if not hasattr(self.inventory_controller, 'model'):
-            raise AttributeError("InventoryController was not initialized correctly. Check if the database is open.")
-
-
-        self.nav_buttons = []
+        
+        # Initialize UI
+        ThemeManager.apply_theme(ThemeType.LIGHT)
         self.init_ui()
-        self.apply_styles()
-
+        
+        # Initialize sidebar with animation
+        self.setup_animations()
 
     def setup_animations(self):
         self.fade_animations = []
@@ -144,43 +147,40 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.animate_sidebar)
         self.timer.start(100)
 
-
     def animate_sidebar(self):
-        # Animate sidebar elements
-        for widget in self.sidebar.findChildren(QWidget):
-            if widget.objectName() in ["nav-container", "user-container"]:
-                animation = QPropertyAnimation(widget, b"windowOpacity")
-                animation.setDuration(500)
-                animation.setStartValue(0.0)
-                animation.setEndValue(1.0)
-                animation.setEasingCurve(QEasingCurve.OutCubic)
-                self.fade_animations.append(animation)
-                animation.start()
+        # Animate sidebar elements with fade-in effect
+        animation = QPropertyAnimation(self.sidebar, b"maximumWidth")
+        animation.setDuration(300)
+        animation.setStartValue(0)
+        animation.setEndValue(250)
+        animation.setEasingCurve(QEasingCurve.OutCubic)
+        self.fade_animations.append(animation)
+        animation.start()
+        
         self.timer.stop()
 
-
     def init_ui(self):
+        # Set window properties
         self.setWindowTitle('Smart Shop Manager')
         self.setMinimumSize(1200, 700)
 
-
+        # Create central widget and main layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-
-
+        
         self.main_layout = QHBoxLayout(central_widget)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
 
-
+        # Create sidebar using our new component
         self.sidebar = self.create_sidebar()
-        self.main_layout.addWidget(self.sidebar, 1)
+        self.main_layout.addWidget(self.sidebar)
 
+        # Create content area
+        self.content_area = self.create_content_area()
+        self.main_layout.addWidget(self.content_area, 5)
 
-        content_area = self.create_content_area()
-        self.main_layout.addWidget(content_area, 5)
-
-
+        # Initialize page stack
         self.add_dashboard_page()
         self.add_inventory_page()
         self.add_sales_page()
@@ -188,125 +188,57 @@ class MainWindow(QMainWindow):
         self.add_suppliers_page()
         self.add_reports_page()
 
-
+        # Set active page
         self.content_stack.setCurrentIndex(0)
         self.update_time_bar()
         self.start_footer_timer()
-       
-        # Show welcome alert with animation
-        self.show_alert("Welcome to Smart Shop Manager! You are logged in as " +
-                      f"{self.current_user.full_name} ({self.current_user.role.capitalize()}).", "info")
-
 
     def create_sidebar(self):
-        sidebar_widget = QWidget()
-        sidebar_widget.setObjectName("sidebar")
-        sidebar_widget.setMinimumWidth(240)
-        sidebar_widget.setMaximumWidth(280)
+        # Create sidebar with our new component
+        sidebar = Sidebar()
+        
+        # Set up navigation pages with icons
+        pages = {
+            "dashboard": {"title": "Dashboard", "icon": "🏠"},
+            "inventory": {"title": "Inventory", "icon": "📦"},
+            "sales": {"title": "Sales", "icon": "💰"},
+            "customers": {"title": "Customers", "icon": "👥"},
+            "suppliers": {"title": "Suppliers", "icon": "🏭"},
+            "reports": {"title": "Reports", "icon": "📊"}
+        }
+        
+        # Set up navigation
+        sidebar.setup_navigation(pages)
+        
+        # Connect the page_changed signal
+        sidebar.page_changed.connect(self.handle_page_changed)
+        
+        # Set up profile info
+        if self.current_user and hasattr(self.current_user, 'full_name') and self.current_user.full_name:
+            sidebar.profile_info.setText(self.current_user.full_name)
+            if self.current_user.full_name:
+                initials = "".join(name[0].upper() for name in self.current_user.full_name.split(' ')[:2])
+                sidebar.profile_icon.setText(initials)
+        
+        # Connect settings button
+        sidebar.settings_button.clicked.connect(self.show_settings)
+        
+        return sidebar
 
-
-        layout = QVBoxLayout(sidebar_widget)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-
-
-        # App title/logo area with enhanced styling
-        title_container = QWidget()
-        title_container.setObjectName("sidebar-header")
-        title_layout = QVBoxLayout(title_container)
-        title_layout.setContentsMargins(15, 25, 15, 25)
-
-
-        # Add logo/icon
-        logo_label = QLabel("🏪")
-        logo_label.setFont(QFont("Segoe UI", 36, QFont.Bold))
-        logo_label.setAlignment(Qt.AlignCenter)
-        title_layout.addWidget(logo_label)
-
-
-        title = QLabel("Smart Shop\nManager")
-        title.setFont(QFont("Segoe UI", 22, QFont.Bold))
-        title.setAlignment(Qt.AlignCenter)
-        title.setObjectName("app-title")
-        title_layout.addWidget(title)
-
-
-        layout.addWidget(title_container)
-
-
-        # Navigation buttons with enhanced styling
-        nav_container = QWidget()
-        nav_container.setObjectName("nav-container")
-        nav_layout = QVBoxLayout(nav_container)
-        nav_layout.setContentsMargins(10, 15, 10, 15)
-        nav_layout.setSpacing(8)
-
-
-        # Create enhanced navigation buttons
-        self.create_nav_button(nav_layout, "🏠 Dashboard", 0)
-        self.create_nav_button(nav_layout, "📦 Inventory", 1)
-        self.create_nav_button(nav_layout, "💳 Sales", 2)
-        self.create_nav_button(nav_layout, "👥 Customers", 3)
-        self.create_nav_button(nav_layout, "🏭 Suppliers", 4)
-        self.create_nav_button(nav_layout, "📊 Reports", 5)
-
-
-        layout.addWidget(nav_container)
-        layout.addStretch()
-
-
-        # User info and settings with enhanced styling
-        user_container = QWidget()
-        user_container.setObjectName("user-container")
-        user_layout = QVBoxLayout(user_container)
-        user_layout.setContentsMargins(15, 20, 15, 20)
-        user_layout.setSpacing(10)
-
-
-        # Add user avatar
-        avatar_label = QLabel("👤")
-        avatar_label.setFont(QFont("Segoe UI", 28, QFont.Bold))
-        avatar_label.setAlignment(Qt.AlignCenter)
-        user_layout.addWidget(avatar_label)
-
-
-        # Divider line
-        divider = QFrame()
-        divider.setFrameShape(QFrame.HLine)
-        divider.setObjectName("sidebar-divider")
-        user_layout.addWidget(divider)
-        user_layout.addSpacing(10)
-
-
-        # User info with enhanced styling
-        user_name = QLabel(f"{self.current_user.full_name}")
-        user_name.setFont(QFont("Segoe UI", 14, QFont.Bold))
-        user_name.setAlignment(Qt.AlignCenter)
-        user_role = QLabel(f"Role: {self.current_user.role.capitalize()}")
-        user_role.setFont(QFont("Segoe UI", 12))
-        user_role.setAlignment(Qt.AlignCenter)
-        user_role.setStyleSheet("color: #9b59b6; font-weight: bold;")
-
-
-        user_layout.addWidget(user_name)
-        user_layout.addWidget(user_role)
-        user_layout.addSpacing(15)
-
-
-        # Enhanced logout button
-        logout_btn = QPushButton("🚪 Logout")
-        logout_btn.setObjectName("logout-btn")
-        logout_btn.setFont(QFont("Segoe UI", 13, QFont.Bold))
-        logout_btn.setStyleSheet("background-color: #e74c3c; color: #fff; border-radius: 8px; padding: 12px; font-weight: bold;")
-        logout_btn.clicked.connect(self.logout)
-        user_layout.addWidget(logout_btn)
-
-
-        layout.addWidget(user_container)
-
-
-        return sidebar_widget
-
+    def handle_page_changed(self, page_id):
+        # Map page IDs to indexes
+        page_indexes = {
+            "dashboard": 0,
+            "inventory": 1,
+            "sales": 2,
+            "customers": 3,
+            "suppliers": 4,
+            "reports": 5
+        }
+        
+        # Change to the selected page
+        if page_id in page_indexes:
+            self.change_page(page_indexes[page_id])
 
     def create_content_area(self):
         content_container = QWidget()
@@ -314,12 +246,10 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-
         # Alert area
         self.alert_widget = AlertWidget()
         self.alert_widget.setVisible(False)
         layout.addWidget(self.alert_widget)
-
 
         # Content header with breadcrumb, back button & time
         header_container = QWidget()
@@ -328,31 +258,26 @@ class MainWindow(QMainWindow):
         header_layout.setContentsMargins(20, 12, 20, 12)
        
         # Back button
-        self.back_button = QPushButton("← Back")
-        self.back_button.setObjectName("back-button")
-        self.back_button.setFont(QFont("Segoe UI", 11))
+        self.back_button = Button("← Back", variant="secondary")
         self.back_button.clicked.connect(self.go_back)
         header_layout.addWidget(self.back_button)
        
         self.page_title = QLabel("Dashboard")
-        self.page_title.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        self.page_title.setFont(QFont(ThemeManager.FONTS["family"], ThemeManager.FONTS["size_xlarge"], QFont.Bold))
         header_layout.addWidget(self.page_title)
        
         header_layout.addStretch()
        
         self.time_label = QLabel()
-        self.time_label.setObjectName("time-label")
-        self.time_label.setFont(QFont("Segoe UI", 11))
+        self.time_label.setFont(QFont(ThemeManager.FONTS["family"], ThemeManager.FONTS["size_normal"]))
         header_layout.addWidget(self.time_label)
        
         layout.addWidget(header_container)
-
 
         # Main content
         self.content_stack = QStackedWidget()
         self.content_stack.setObjectName("content-stack")
         layout.addWidget(self.content_stack, 1)  # Give it stretch factor
-
 
         # Footer
         footer_container = QWidget()
@@ -361,389 +286,175 @@ class MainWindow(QMainWindow):
         footer_layout.setContentsMargins(20, 10, 20, 10)
        
         copyright_label = QLabel("© 2025 Smart Shop Manager | Developed by Sifat Ali")
-        copyright_label.setFont(QFont("Segoe UI", 10))
+        copyright_label.setFont(QFont(ThemeManager.FONTS["family"], ThemeManager.FONTS["size_small"]))
         footer_layout.addWidget(copyright_label)
        
         footer_layout.addStretch()
        
         self.datetime_label = QLabel()
-        self.datetime_label.setObjectName("datetime-label")
-        self.datetime_label.setFont(QFont("Segoe UI", 10))
+        self.datetime_label.setFont(QFont(ThemeManager.FONTS["family"], ThemeManager.FONTS["size_small"]))
         footer_layout.addWidget(self.datetime_label)
        
         layout.addWidget(footer_container)
 
-
         return content_container
 
-
-    def apply_styles(self):
-        self.setStyleSheet("""
-            QMainWindow, QWidget#content-stack {
-                background-color: #ffffff;
-                color: #333333;
-            }
-
-            QWidget#sidebar {
-                background-color: #2c3e50;
-                color: #ffffff;
-                border-right: 1px solid #34495e;
-            }
-
-            QWidget#sidebar-header {
-                background-color: #1a2530;
-                border-bottom: 1px solid #34495e;
-            }
-
-            QLabel#app-title {
-                color: #ffffff;
-                font-weight: bold;
-                font-size: 16px;
-                margin-top: 10px;
-            }
-
-            QWidget#content-header, QWidget#footer {
-                background-color: #f8f9fa;
-                color: #555555;
-                border-bottom: 1px solid #e9ecef;
-            }
-
-            QFrame#sidebar-divider {
-                background-color: #34495e;
-                height: 2px;
-            }
-
-            QPushButton {
-                border-radius: 6px;
-                padding: 10px 15px;
-                font-weight: 500;
-                font-size: 13px;
-            }
-
-            QWidget#nav-container QPushButton {
-                color: #ffffff;
-                border: none;
-                text-align: left;
-                padding: 12px 20px;
-                font-size: 13px;
-                border-radius: 8px;
-                margin: 2px 0;
-            }
-
-            QWidget#nav-container QPushButton:hover {
-                background-color: #34495e;
-            }
-
-            QWidget#nav-container QPushButton:checked {
-                background-color: #3498db;
-                font-weight: bold;
-                border-left: 4px solid #2980b9;
-            }
-
-            QPushButton#logout-btn {
-                background-color: #e74c3c;
-                color: #ffffff;
-                font-weight: bold;
-                margin-top: 10px;
-                border-radius: 8px;
-                padding: 12px;
-                text-align: center;
-                font-size: 13px;
-            }
-
-            QPushButton#logout-btn:hover {
-                background-color: #c0392b;
-            }
-
-            QPushButton#back-button {
-                background-color: #3498db;
-                color: #ffffff;
-                font-weight: bold;
-                border-radius: 6px;
-                padding: 8px 15px;
-                margin-right: 15px;
-                font-size: 13px;
-            }
-
-            QPushButton#back-button:hover {
-                background-color: #2980b9;
-            }
-
-            QLabel#time-label, QLabel#datetime-label {
-                color: #444444;
-                font-weight: 500;
-                font-size: 13px;
-            }
-
-            QWidget#user-container {
-                color: #ffffff;
-                background-color: #34495e;
-                border-radius: 10px;
-                margin: 10px;
-            }
-
-            /* Card styles for dashboard and other pages */
-            QFrame.card {
-                background-color: #ffffff;
-                border-radius: 10px;
-                border: 1px solid #e0e0e0;
-                padding: 15px;
-            }
-
-            QFrame.card QLabel.card-title {
-                color: #2c3e50;
-                font-size: 14px;
-                font-weight: bold;
-                padding-bottom: 10px;
-            }
-
-            QFrame.card QLabel.card-value {
-                color: #3498db;
-                font-size: 16px;
-                font-weight: bold;
-            }
-
-            QFrame.card QLabel.card-description {
-                color: #7f8c8d;
-                font-size: 13px;
-            }
-
-            /* Message box button styles */
-            QMessageBox QPushButton {
-                min-width: 80px;
-                min-height: 30px;
-                font-size: 13px;
-                font-weight: bold;
-                border-radius: 4px;
-                padding: 5px 15px;
-            }
-
-            QMessageBox QPushButton[text="OK"] {
-                background-color: #3498db;
-                color: white;
-            }
-
-            QMessageBox QPushButton[text="Yes"] {
-                background-color: #2ecc71;
-                color: white;
-            }
-
-            QMessageBox QPushButton[text="No"] {
-                background-color: #e74c3c;
-                color: white;
-            }
-
-            QMessageBox QPushButton[text="Cancel"] {
-                background-color: #95a5a6;
-                color: white;
-            }
-
-            /* Scrollbar styling */
-            QScrollBar:vertical {
-                border: none;
-                background: #f0f0f0;
-                width: 10px;
-                margin: 0px;
-            }
-
-            QScrollBar::handle:vertical {
-                background: #c0c0c0;
-                min-height: 20px;
-                border-radius: 5px;
-            }
-
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-            }
-        """)
-
-
     def start_footer_timer(self):
-        self.footer_timer = QTimer(self)
-        self.footer_timer.timeout.connect(self.update_datetime)
-        self.footer_timer.start(1000)  # Update every 1 second
-
+        # Update time every second
+        self.datetime_timer = QTimer(self)
+        self.datetime_timer.timeout.connect(self.update_datetime)
+        self.datetime_timer.start(1000)
+        self.update_datetime()
 
     def update_datetime(self):
         current_datetime = QDateTime.currentDateTime()
-        time_str = current_datetime.toString("hh:mm:ss AP")
-        date_str = current_datetime.toString("dddd, MMMM d, yyyy")
-       
-        self.time_label.setText(time_str)
-        self.datetime_label.setText(date_str)
-
+        datetime_text = current_datetime.toString("dddd, MMMM d, yyyy - hh:mm:ss AP")
+        self.datetime_label.setText(datetime_text)
+        self.time_label.setText(current_datetime.toString("hh:mm:ss AP"))
 
     def update_time_bar(self):
-        current_datetime = QDateTime.currentDateTime()
-        date_str = current_datetime.toString("dddd, MMMM d, yyyy")
-        time_str = current_datetime.toString("hh:mm:ss AP")
-       
-        self.time_label.setText(time_str)
-        self.datetime_label.setText(date_str)
-
-
-    def create_nav_button(self, layout, text, page_index):
-        button = QPushButton(text)
-        button.setFont(QFont("Segoe UI", 13))
-        button.setCheckable(True)
-        button.setMinimumHeight(45)
-        button.clicked.connect(lambda: self.change_page(page_index))
-        layout.addWidget(button)
-        self.nav_buttons.append(button)
-
-
-        if page_index == 0:
-            button.setChecked(True)
-
+        current_time = QDateTime.currentDateTime().toString("hh:mm:ss AP")
+        self.time_label.setText(current_time)
 
     def change_page(self, index):
         # Store previous page for back button
         self.previous_page_index = self.content_stack.currentIndex()
-       
-        # Update buttons
-        for btn in self.nav_buttons:
-            btn.setChecked(False)
-       
-        if isinstance(self.sender(), QPushButton):
-            self.sender().setChecked(True)
-        else:
-            self.nav_buttons[index].setChecked(True)
-       
-        # Update content
+        
+        # Change to new page
         self.content_stack.setCurrentIndex(index)
-       
-        # Refresh data on navigation
-        widget = self.content_stack.widget(index)
-        if hasattr(widget, 'refresh_from_controller'):
-            widget.refresh_from_controller()
-       
+        
         # Update page title
-        titles = [
-            "Dashboard", "Inventory Management",
-            "Sales & Billing", "Customer Management",
-            "Supplier Management", "Reports & Analytics"
+        page_titles = [
+            "Dashboard",
+            "Inventory Management",
+            "Sales & Orders",
+            "Customer Management",
+            "Supplier Management",
+            "Reports & Analytics"
         ]
-        self.page_title.setText(titles[index])
-       
-        # Notification
-        self.show_alert(f"Viewing {titles[index]}", "info")
-
+        
+        if 0 <= index < len(page_titles):
+            self.page_title.setText(page_titles[index])
+        
+        # Update sidebar selection
+        page_ids = [
+            "dashboard",
+            "inventory",
+            "sales", 
+            "customers",
+            "suppliers",
+            "reports"
+        ]
+        
+        if 0 <= index < len(page_ids):
+            self.sidebar.select_page(page_ids[index])
 
     def go_back(self):
-        """Navigate to previous page"""
         self.change_page(self.previous_page_index)
-        self.show_alert("Returned to previous page", "info")
-
 
     def show_alert(self, message, level="info"):
         self.alert_widget.show_alert(message, level)
 
-
     def add_dashboard_page(self):
-        dashboard = DashboardPage()
-        dashboard.view_inventory_requested.connect(lambda: self.change_page(1))
-        dashboard.view_add_product_requested.connect(self.handle_add_product_from_dashboard)
-        dashboard.view_orders_requested.connect(lambda: self.change_page(2))
+        # Create dashboard page
+        dashboard = DashboardPage(self)
+        dashboard.add_product_btn.clicked.connect(self.handle_add_product_from_dashboard)
         self.content_stack.addWidget(dashboard)
 
-
     def handle_add_product_from_dashboard(self):
-        self.change_page(1)
-        # Find the inventory view and open add dialog
-        inventory_view = None
+        # Switch to inventory page
+        inventory_idx = 1
         for i in range(self.content_stack.count()):
-            widget = self.content_stack.widget(i)
-            if isinstance(widget, InventoryView):
-                inventory_view = widget
+            if isinstance(self.content_stack.widget(i), InventoryView):
+                inventory_idx = i
                 break
-        if inventory_view:
-            inventory_view.show_add_dialog()
-
+                
+        # Change to inventory page and trigger add product
+        self.change_page(inventory_idx)
+        inventory_page = self.content_stack.widget(inventory_idx)
+        if hasattr(inventory_page, 'show_add_product_dialog'):
+            inventory_page.show_add_product_dialog()
 
     def add_inventory_page(self):
-        inventory_view = InventoryView(self.inventory_controller)
+        # Create inventory page
+        inventory_view = InventoryView()
         self.content_stack.addWidget(inventory_view)
 
-
     def add_sales_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(20, 20, 20, 20)
-       
-        header = QLabel("Sales & Billing")
-        header.setFont(QFont("Segoe UI", 24, QFont.Bold))
-       
-        layout.addWidget(header)
-       
-        info_label = QLabel("Sales interface goes here...")
-        info_label.setFont(QFont("Segoe UI", 14))
-        layout.addWidget(info_label)
-        layout.addStretch()
-       
-        self.content_stack.addWidget(page)
-
+        # Create sales page
+        sales_view = SalesView()
+        self.content_stack.addWidget(sales_view)
 
     def add_customers_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(20, 20, 20, 20)
-       
-        header = QLabel("Customer Management")
-        header.setFont(QFont("Segoe UI", 24, QFont.Bold))
-       
-        layout.addWidget(header)
-       
-        info_label = QLabel("Customer records shown here...")
-        info_label.setFont(QFont("Segoe UI", 14))
-        layout.addWidget(info_label)
-        layout.addStretch()
-       
-        self.content_stack.addWidget(page)
-
+        # Create customers page
+        customers_view = CustomerView()
+        self.content_stack.addWidget(customers_view)
 
     def add_suppliers_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(20, 20, 20, 20)
-       
-        header = QLabel("Supplier Management")
-        header.setFont(QFont("Segoe UI", 24, QFont.Bold))
-       
+        # Create placeholder for suppliers page
+        suppliers_view = QWidget()
+        layout = QVBoxLayout(suppliers_view)
+        
+        # Create page header using our component
+        header = PageHeader("Supplier Management", "Manage your product suppliers")
+        
+        # Add action button
+        add_btn = Button("Add Supplier", variant="primary")
+        header.add_action(add_btn)
+        
+        # Create page content
+        content = QLabel("Suppliers management coming soon...")
+        content.setAlignment(Qt.AlignCenter)
+        content.setFont(QFont(ThemeManager.FONTS["family"], ThemeManager.FONTS["size_large"]))
+        
+        # Layout components
         layout.addWidget(header)
-       
-        info_label = QLabel("Supplier list will be added here...")
-        info_label.setFont(QFont("Segoe UI", 14))
-        layout.addWidget(info_label)
+        layout.addWidget(content)
         layout.addStretch()
-       
-        self.content_stack.addWidget(page)
-
+        
+        self.content_stack.addWidget(suppliers_view)
 
     def add_reports_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(20, 20, 20, 20)
-       
-        header = QLabel("Reports & Analytics")
-        header.setFont(QFont("Segoe UI", 24, QFont.Bold))
-       
-        layout.addWidget(header)
-       
-        info_label = QLabel("Reports dashboard coming soon...")
-        info_label.setFont(QFont("Segoe UI", 14))
-        layout.addWidget(info_label)
-        layout.addStretch()
-       
-        self.content_stack.addWidget(page)
-
+        # Create reports page using ReportsView
+        reports_view = ReportsView()
+        self.content_stack.addWidget(reports_view)
 
     def logout(self):
-        self.show_alert("Logging out...", "warning")
-        # Add slight delay to show the message before actually logging out
-        QTimer.singleShot(500, lambda: self.actually_logout())
-   
+        # Ask for confirmation before logout
+        response = QMessageBox.question(self, "Confirm Logout", 
+                                      "Are you sure you want to logout?", 
+                                      QMessageBox.Yes | QMessageBox.No)
+        if response == QMessageBox.Yes:
+            # Add slight animation and delay before logging out
+            QTimer.singleShot(300, self.actually_logout)
+
     def actually_logout(self):
-        print("Logout initiated")
         self.logout_requested.emit()
-        self.close()
+        
+    def show_settings(self):
+        # Display theme selection dialog
+        themes = [
+            {"name": "Light Theme", "type": ThemeType.LIGHT},
+            {"name": "Dark Theme", "type": ThemeType.DARK},
+            {"name": "Blue Theme", "type": ThemeType.BLUE}
+        ]
+        
+        msg = QMessageBox()
+        msg.setWindowTitle("Application Settings")
+        msg.setText("Select a theme:")
+        
+        for theme in themes:
+            button = msg.addButton(theme["name"], QMessageBox.ActionRole)
+            button.setProperty("theme_type", theme["type"])
+        
+        cancel_button = msg.addButton("Cancel", QMessageBox.RejectRole)
+        
+        msg.exec_()
+        
+        clicked_button = msg.clickedButton()
+        if clicked_button and clicked_button != cancel_button:
+            theme_type = clicked_button.property("theme_type")
+            if theme_type:
+                ThemeManager.apply_theme(theme_type)
+                self.show_alert(f"Theme changed to {clicked_button.text()}", "success")
 

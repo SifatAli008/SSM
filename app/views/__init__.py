@@ -5,9 +5,7 @@
 
 # Optionally, expose common views here if you want easier imports elsewhere in the project.
 
-from .dashboard_view import DashboardPage
-from .inventory_view import InventoryView
-from .main_window import MainWindow
+# No imports here to avoid circular dependencies
 
 __all__ = [
     "DashboardPage",

@@ -1,10 +1,15 @@
 import sqlite3
 import os
+from pathlib import Path
 
 def create_db():
     """Create SQLite database and initialize the inventory table."""
-    db_path = 'E:/UDH/smart_shop_manager/data/shop.db'  # Ensure this path is correct
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)  # Create directories if not exist
+    # Use a relative path to find the database
+    base_dir = Path(__file__).resolve().parent.parent
+    db_path = os.path.join(base_dir, "data", "shop.db")
+    
+    # Create directories if they don't exist
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
     # Connect to the SQLite database (it will be created if it doesn't exist)
     conn = sqlite3.connect(db_path)
@@ -25,7 +30,7 @@ def create_db():
     conn.commit()
     conn.close()
 
-    print("Database created and table initialized.")
+    print(f"Database created and table initialized at {db_path}")
 
 if __name__ == "__main__":
     create_db()

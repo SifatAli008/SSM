@@ -1,33 +1,23 @@
-from PyQt5.QtSql import QSqlDatabase, QSqlTableModel, QSqlQuery
+from PyQt5.QtSql import QSqlTableModel, QSqlQuery
 from PyQt5.QtCore import Qt
 import os
 import csv
 import datetime
+from app.utils.database import DatabaseManager
+from app.utils.logger import logger
 
 class InventoryController:
     def __init__(self):
-        # Define the path to the SQLite database file
-        db_path = 'data/shop.db'  # Changed to relative path for better portability
-
-        # Create directory if not exists
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        # Setup database connection using DatabaseManager
+        self.db = DatabaseManager.get_qt_connection()
         
-        # Setup SQLite database connection
-        self.db = QSqlDatabase.database('qt_sql_default_connection', False)
-        
-        if not self.db.isValid():
-            self.db = QSqlDatabase.addDatabase('QSQLITE', 'qt_sql_default_connection')
-            self.db.setDatabaseName(db_path)
-
-            if not self.db.open():
-                print(f"❌ Error: Database not open! Reason: {self.db.lastError().text()}")
-                return
+        if not self.db or not self.db.isOpen():
+            logger.error("Failed to open database connection in InventoryController")
+            return
             
-            # Create tables if they don't exist
-            self._create_tables()
-            print("✅ Database connection established successfully.")
-        else:
-            print("⚠️ Database connection already established.")
+        # Create tables if they don't exist
+        self._create_tables()
+        logger.info("Inventory controller initialized with database connection")
 
         # Initialize the model for the inventory table
         self.model = QSqlTableModel(db=self.db)

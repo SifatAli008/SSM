@@ -1,15 +1,22 @@
 from PyQt5.QtSql import QSqlDatabase
 import os
+from pathlib import Path
 
 def init_sqlite_connection():
     db = QSqlDatabase.addDatabase("QSQLITE")
     
-    db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "E:/UDH/smart_shop_manager/data/shop.db"))
+    # Use a relative path to find the database
+    base_dir = Path(__file__).resolve().parent.parent
+    db_path = os.path.join(base_dir, "data", "shop.db")
+    
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    
     db.setDatabaseName(db_path)
 
     if not db.open():
-        print("❌ Failed to open SQLite database at:", db_path)
+        print(f"❌ Failed to open SQLite database at: {db_path}")
         return None
 
-    print("✅ SQLite database connection opened at:", db_path)
+    print(f"✅ SQLite database connection opened at: {db_path}")
     return db

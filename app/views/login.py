@@ -5,94 +5,86 @@ from PyQt5.QtWidgets import (
     QFrame, QCheckBox
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QIcon
 
-from controllers.auth_controller import AuthController
-from views.main_window import MainWindow
+from app.controllers.auth_controller import AuthController
+from app.views.main_window import MainWindow
+from app.views.widgets.components import Button, Card
+from app.utils.theme_manager import ThemeManager, ThemeType
 
 
 class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.auth_controller = AuthController()
+        # Explicitly apply light theme
+        ThemeManager.apply_theme(ThemeType.LIGHT)
         self.init_ui()
 
     def init_ui(self):
         self.setWindowTitle('Smart Shop Manager - Login')
         self.setFixedSize(460, 600)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #f9f9f9;
-                font-family: 'Segoe UI', sans-serif;
-            }
-            QLabel {
-                color: #333;
-            }
-            QLineEdit {
-                padding: 10px;
-                border: 1px solid #ccc;
-                border-radius: 6px;
-                background-color: white;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border: 2px solid #3498db;
-            }
-            QPushButton#loginButton {
-                background-color: #3498db;
-                color: white;
-                border-radius: 6px;
-                font-weight: bold;
-                font-size: 16px;
-                padding: 12px;
-            }
-            QPushButton#loginButton:hover {
-                background-color: #2980b9;
-            }
-            QPushButton#adminLink {
-                color: #3498db;
-                text-decoration: underline;
-                font-size: 13px;
-            }
-            QPushButton#adminLink:hover {
-                color: #2980b9;
-            }
+        
+        # Use container widget for proper styling
+        container = QWidget(self)
+        container.setGeometry(0, 0, 460, 600)
+        container.setStyleSheet(f"""
+            QWidget {{
+                background-color: {ThemeManager.get_color('background')};
+                font-family: '{ThemeManager.FONTS['family']}';
+                color: {ThemeManager.get_color('text_primary')};
+            }}
         """)
-
-        layout = QVBoxLayout()
+        
+        layout = QVBoxLayout(container)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(16)
 
         # Title
+        title_container = QWidget()
+        title_container.setStyleSheet("background-color: transparent;")
+        title_layout = QVBoxLayout(title_container)
+        title_layout.setAlignment(Qt.AlignCenter)
+        
+        # Logo/icon
+        logo_label = QLabel("🏪")
+        logo_label.setFont(QFont(ThemeManager.FONTS["family"], 36, QFont.Bold))
+        logo_label.setAlignment(Qt.AlignCenter)
+        logo_label.setStyleSheet(f"color: {ThemeManager.get_color('text_primary')}; background-color: transparent;")
+        title_layout.addWidget(logo_label)
+        
         title = QLabel('Smart Shop Manager')
-        title.setFont(QFont('Segoe UI', 22, QFont.Bold))
+        title.setFont(QFont(ThemeManager.FONTS["family"], 22, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
+        title.setStyleSheet(f"color: {ThemeManager.get_color('text_primary')}; background-color: transparent;")
+        title_layout.addWidget(title)
 
         subtitle = QLabel('Login to access your dashboard')
         subtitle.setAlignment(Qt.AlignCenter)
-        subtitle.setStyleSheet("color: #666; font-size: 13px;")
-        layout.addWidget(subtitle)
+        subtitle.setStyleSheet(f"color: {ThemeManager.get_color('text_secondary')}; font-size: 13px; background-color: transparent;")
+        title_layout.addWidget(subtitle)
 
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setStyleSheet("color: #ccc;")
-        layout.addWidget(line)
+        layout.addWidget(title_container)
 
-        # Form layout
+        # Login card with form
+        login_card = Card()
         form_layout = QVBoxLayout()
         form_layout.setSpacing(12)
 
         # Username
         username_label = QLabel("Username")
+        username_label.setStyleSheet(f"color: {ThemeManager.get_color('text_primary')}; background-color: transparent;")
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Enter your username")
+        self.username_input.setMinimumHeight(40)
 
         # Password
         password_label = QLabel("Password")
+        password_label.setStyleSheet(f"color: {ThemeManager.get_color('text_primary')}; background-color: transparent;")
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Enter your password")
         self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.setMinimumHeight(40)
 
         form_layout.addWidget(username_label)
         form_layout.addWidget(self.username_input)
@@ -102,19 +94,30 @@ class LoginWindow(QWidget):
         # Remember Me + Forgot Password
         remember_forgot_layout = QHBoxLayout()
         self.remember_me = QCheckBox("Remember me")
+        self.remember_me.setStyleSheet(f"color: {ThemeManager.get_color('text_primary')}; background-color: transparent;")
         self.forgot_password = QPushButton("Forgot password?")
-        self.forgot_password.setObjectName('adminLink')
         self.forgot_password.setFlat(True)
         self.forgot_password.setCursor(Qt.PointingHandCursor)
+        self.forgot_password.setStyleSheet(f"""
+            QPushButton {{
+                color: {ThemeManager.get_color('primary')};
+                text-decoration: underline;
+                font-size: 13px;
+                background: transparent;
+                border: none;
+            }}
+        """)
 
         remember_forgot_layout.addWidget(self.remember_me)
         remember_forgot_layout.addStretch()
         remember_forgot_layout.addWidget(self.forgot_password)
         form_layout.addLayout(remember_forgot_layout)
+        form_layout.addSpacing(10)
 
         # Role Selection
         role_label = QLabel("Login as:")
-        role_label.setFont(QFont('Segoe UI', 11))
+        role_label.setFont(QFont(ThemeManager.FONTS['family'], 11))
+        role_label.setStyleSheet(f"color: {ThemeManager.get_color('text_primary')}; background-color: transparent;")
         form_layout.addWidget(role_label)
 
         roles_layout = QHBoxLayout()
@@ -130,24 +133,38 @@ class LoginWindow(QWidget):
         roles_layout.addWidget(self.manager_button)
         roles_layout.addWidget(self.cashier_button)
         form_layout.addLayout(roles_layout)
+        form_layout.addSpacing(10)
 
-        # Login button
-        self.login_button = QPushButton("LOGIN")
-        self.login_button.setObjectName("loginButton")
+        # Login button using our Button component
+        self.login_button = Button("LOGIN", variant="primary")
+        self.login_button.setMinimumHeight(45)
         self.login_button.setCursor(Qt.PointingHandCursor)
         self.login_button.clicked.connect(self.handle_login)
         form_layout.addWidget(self.login_button)
 
-        layout.addLayout(form_layout)
+        login_card.layout.addLayout(form_layout)
+        layout.addWidget(login_card)
 
         # Footer
         footer = QHBoxLayout()
         footer.addStretch()
         footer_label = QLabel("Need help? Contact the ")
+        footer_label.setStyleSheet(f"color: {ThemeManager.get_color('text_secondary')}; background-color: transparent;")
         self.admin_link = QPushButton("System Administrator")
-        self.admin_link.setObjectName("adminLink")
         self.admin_link.setFlat(True)
         self.admin_link.setCursor(Qt.PointingHandCursor)
+        self.admin_link.setStyleSheet(f"""
+            QPushButton {{
+                color: {ThemeManager.get_color('primary')};
+                text-decoration: underline;
+                font-size: 13px;
+                background: transparent;
+                border: none;
+            }}
+            QPushButton:hover {{
+                color: {ThemeManager.get_color('primary_dark')};
+            }}
+        """)
 
         footer.addWidget(footer_label)
         footer.addWidget(self.admin_link)
@@ -155,7 +172,6 @@ class LoginWindow(QWidget):
         layout.addLayout(footer)
 
         # Events
-        self.setLayout(layout)
         self.username_input.setFocus()
         self.username_input.returnPressed.connect(lambda: self.password_input.setFocus())
         self.password_input.returnPressed.connect(self.handle_login)
@@ -167,18 +183,22 @@ class LoginWindow(QWidget):
         btn.setCheckable(True)
         btn.setChecked(checked)
         btn.setMinimumHeight(36)
-        btn.setStyleSheet("""
-            QPushButton {
+        btn.setStyleSheet(f"""
+            QPushButton {{
                 padding: 6px 15px;
-                border: 1px solid #ccc;
-                border-radius: 6px;
-                background-color: #f4f4f4;
-            }
-            QPushButton:checked {
-                background-color: #3498db;
+                border: 1px solid {ThemeManager.get_color('border')};
+                border-radius: {ThemeManager.BORDER_RADIUS['small']}px;
+                background-color: {ThemeManager.get_color('card')};
+                color: {ThemeManager.get_color('text_primary')};
+            }}
+            QPushButton:checked {{
+                background-color: {ThemeManager.get_color('primary')};
                 color: white;
-                border: 1px solid #2980b9;
-            }
+                border: 1px solid {ThemeManager.get_color('primary_dark')};
+            }}
+            QPushButton:hover:!checked {{
+                background-color: {ThemeManager.get_color('hover')};
+            }}
         """)
         return btn
 
@@ -228,9 +248,10 @@ class LoginWindow(QWidget):
         self.main_window = MainWindow(user)
         self.main_window.logout_requested.connect(self.show_again)
         self.main_window.show()
-        self.close()
+        self.hide()
 
     def show_again(self):
+        self.password_input.clear()
         self.show()
 
     def contact_admin(self):
