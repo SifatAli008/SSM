@@ -13,8 +13,8 @@ from PyQt5.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox,
     QFormLayout, QGroupBox, QCheckBox, QRadioButton
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QSize
-from PyQt5.QtGui import QIcon, QFont, QPixmap, QColor
+from PyQt5.QtCore import Qt, pyqtSignal, QSize, QPoint
+from PyQt5.QtGui import QIcon, QFont, QPixmap, QColor, QPainter, QPen, QBrush
 
 # Use absolute import for ThemeManager
 from app.utils.theme_manager import ThemeManager
@@ -380,6 +380,108 @@ class Button(QPushButton):
         self.setProperty("class", variant)
         self.style().unpolish(self)
         self.style().polish(self)
+
+class ComboBox(QComboBox):
+    """Enhanced combobox with improved visibility for dropdown items"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setMinimumHeight(36)
+        
+        # Force style with direct color values for maximum compatibility
+        self.setStyleSheet("""
+            QComboBox {
+                padding: 5px 35px 5px 10px;
+                border: 1px solid #D1D5DB;
+                border-radius: 6px;
+                background-color: #FFFFFF;
+                color: #000000;
+                min-height: 36px;
+            }
+            
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: center right;
+                width: 25px;
+                border-left: 1px solid #D1D5DB;
+                border-top-right-radius: 6px;
+                border-bottom-right-radius: 6px;
+                background: #FFFFFF;
+            }
+            
+            QComboBox::down-arrow {
+                width: 0px;
+                height: 0px;
+                image: none;
+            }
+        """)
+        
+        # Set view mode to be more compatible across platforms
+        self.setView(self.createStandardView())
+        
+        # Fix popup appearance on Windows
+        self.setMaxVisibleItems(10)
+        self.view().window().setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
+        self.view().window().setAttribute(Qt.WA_TranslucentBackground)
+    
+    def createStandardView(self):
+        """Create a standard list view with appropriate styling"""
+        from PyQt5.QtWidgets import QListView
+        view = QListView()
+        view.setStyleSheet("""
+            QListView {
+                background-color: #FFFFFF;
+                border: 1px solid #D1D5DB;
+                color: #000000;
+                outline: none;
+                padding: 5px 0px;
+            }
+            
+            QListView::item {
+                background-color: #FFFFFF;
+                color: #000000;
+                min-height: 30px;
+                padding: 5px 10px;
+                border-bottom: 1px solid #F0F0F0;
+            }
+            
+            QListView::item:selected {
+                background-color: #3B82F6;
+                color: #FFFFFF;
+            }
+            
+            QListView::item:hover:!selected {
+                background-color: #F3F4F6;
+            }
+        """)
+        return view
+    
+    def paintEvent(self, event):
+        """Custom paint event to draw a better dropdown arrow"""
+        super().paintEvent(event)
+        
+        # Draw a custom dropdown arrow that will be visible
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        # Set the arrow color
+        painter.setPen(QPen(QColor("#000000")))
+        painter.setBrush(QBrush(QColor("#000000")))
+        
+        # Arrow size and position
+        width = 10
+        height = 6
+        x = self.width() - width - 15
+        y = (self.height() - height) // 2
+        
+        # Draw the arrow pointing down
+        points = [
+            QPoint(x, y),
+            QPoint(x + width, y),
+            QPoint(x + width // 2, y + height)
+        ]
+        painter.drawPolygon(points)
 
 class TableComponent(QTableWidget):
     """Enhanced table with consistent styling and features"""

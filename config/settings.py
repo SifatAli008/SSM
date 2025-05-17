@@ -42,9 +42,23 @@ DEFAULT_CASHIER_PASSWORD = "cashierPass123"
 # Backup Settings
 BACKUP_INTERVAL_DAYS = 1
 LOCAL_BACKUP_PATH = "backups/"
+AUTO_BACKUP_ENABLED = True
+BACKUP_FREQUENCY = "monthly"  # Options: daily, weekly, monthly
 
 # Report Settings
 REPORT_OUTPUT_PATH = "reports/"
+
+# UI Theme settings
+DEFAULT_THEME = "light"  # Only Light theme is supported
+FONT_SIZE = "small"  # Options: small, medium, large
+REMEMBER_WINDOW_SIZE = True
+CONFIRM_EXIT = True
+AUTO_SAVE_INTERVAL = 10  # Minutes
+
+# User Preferences
+DEFAULT_VIEW = "reports"  # Default starting view
+NOTIFICATIONS_ENABLED = True
+LOW_STOCK_THRESHOLD = 13  # Items below this count trigger low stock alerts
 
 # UI Theme colors
 UI_COLORS = {

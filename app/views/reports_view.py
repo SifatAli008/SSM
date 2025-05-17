@@ -5,11 +5,13 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QFont, QIcon, QColor
+from PyQt5.QtWidgets import QApplication
 
 from app.controllers.reports_controller import ReportsController
 from app.utils.logger import logger
 from app.utils.theme_manager import ThemeManager
 from app.views.widgets.components import Card, Button
+import os
 
 class ReportCard(Card):
     """A styled card for displaying report information"""
@@ -361,7 +363,7 @@ class ReportsView(QWidget):
         
         # Financial Reports Section
         financial_header = SectionHeader("FINANCIAL REPORTS", "💹")
-        financial_header.print_btn.clicked.connect(lambda: QMessageBox.information(self, "Generate Report", "Financial report generation will be implemented in a future update."))
+        financial_header.print_btn.clicked.connect(self.generate_financial_report)
         main_layout.addWidget(financial_header)
         
         financial_grid = QGridLayout()
@@ -445,9 +447,9 @@ class ReportsView(QWidget):
         
         main_layout.addLayout(financial_grid)
         
-        # Customer & Supplier Reports Section
-        customer_header = SectionHeader("CUSTOMER & SUPPLIER REPORTS", "👥")
-        customer_header.print_btn.clicked.connect(lambda: QMessageBox.information(self, "Generate Report", "Customer & Supplier report generation will be implemented in a future update."))
+        # Customer Reports Section
+        customer_header = SectionHeader("CUSTOMER REPORTS", "👥")
+        customer_header.print_btn.clicked.connect(self.generate_customer_report)
         main_layout.addWidget(customer_header)
         
         customer_grid = QGridLayout()
@@ -456,7 +458,6 @@ class ReportsView(QWidget):
         # Configure column stretching
         customer_grid.setColumnStretch(0, 1)
         customer_grid.setColumnStretch(1, 1)
-        customer_grid.setColumnStretch(2, 1)
         
         # Customer insights card
         customer_insights = DetailCard("👥 Customer Insights")
@@ -481,30 +482,6 @@ class ReportsView(QWidget):
         customer_layout.addStretch()
         
         customer_insights.layout.addLayout(customer_layout)
-        
-        # Supplier performance card
-        supplier_performance = DetailCard("🏭 Supplier Performance")
-        supplier_layout = QVBoxLayout()
-        supplier_layout.setSpacing(12)
-        
-        on_time = QLabel("On-Time: 🌟 95%")
-        on_time.setStyleSheet("color: #33AA33; font-weight: bold; background-color: transparent;")
-        on_time.setFont(QFont(ThemeManager.FONTS["family"], 14))
-        
-        reliability = QLabel("Reliability: ✅ High")
-        reliability.setStyleSheet("color: #333333; background-color: transparent;")
-        reliability.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        quality = QLabel("Quality Issues: ✓...")
-        quality.setStyleSheet("color: #333333; background-color: transparent;")
-        quality.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        supplier_layout.addWidget(on_time)
-        supplier_layout.addWidget(reliability)
-        supplier_layout.addWidget(quality)
-        supplier_layout.addStretch()
-        
-        supplier_performance.layout.addLayout(supplier_layout)
         
         # Outstanding payments card
         outstanding_payments = DetailCard("💵 Outstanding Payments")
@@ -531,8 +508,7 @@ class ReportsView(QWidget):
         outstanding_payments.layout.addLayout(payments_layout)
         
         customer_grid.addWidget(customer_insights, 0, 0)
-        customer_grid.addWidget(supplier_performance, 0, 1)
-        customer_grid.addWidget(outstanding_payments, 0, 2)
+        customer_grid.addWidget(outstanding_payments, 0, 1)
         
         main_layout.addLayout(customer_grid)
         
@@ -546,7 +522,7 @@ class ReportsView(QWidget):
     def connect_signals(self):
         """Connect widget signals to handlers"""
         self.period_combo.currentIndexChanged.connect(self.load_data)
-        self.refresh_btn.clicked.connect(self.load_data)
+        self.refresh_btn.clicked.connect(self.refresh_data)
     
     def get_selected_period(self):
         """Convert the UI period selection to controller period string"""
@@ -590,22 +566,63 @@ class ReportsView(QWidget):
             logger.error(f"Error loading report data: {str(e)}")
             QMessageBox.warning(self, "Data Error", f"Failed to load some report data: {str(e)}")
     
+    def refresh_data(self):
+        """Refresh data with visual feedback"""
+        try:
+            # Show a waiting cursor
+            QApplication.setOverrideCursor(Qt.WaitCursor)
+            
+            # Load the data
+            self.load_data()
+            
+            # Restore the cursor
+            QApplication.restoreOverrideCursor()
+            
+            # Show success message
+            self.show_refresh_success()
+        except Exception as e:
+            # Restore the cursor in case of error
+            QApplication.restoreOverrideCursor()
+            logger.error(f"Error refreshing data: {str(e)}")
+            QMessageBox.warning(self, "Refresh Error", f"Failed to refresh data: {str(e)}")
+    
+    def show_refresh_success(self):
+        """Show a brief success message for data refresh"""
+        msg = QMessageBox()
+        msg.setWindowTitle("Data Refreshed")
+        msg.setText("Report data has been refreshed successfully.")
+        msg.setIcon(QMessageBox.Information)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.setDefaultButton(QMessageBox.Ok)
+        msg.exec_()
+    
     def generate_sales_report(self):
         """Generate and open sales report PDF"""
         try:
             period = self.get_selected_period()
             
-            # Show a waiting cursor or message
+            # Show processing dialog
             QMessageBox.information(self, "Generating Report", "Generating sales report. This may take a moment...")
             
             # Generate the report
-            report_path = self.controller.generate_sales_report(period)
+            result = self.controller.generate_sales_report(period)
             
-            if report_path:
-                QMessageBox.information(self, "Report Generated", f"Sales report generated successfully: {report_path}")
-                # TODO: Open the report PDF if possible
+            if result:
+                QMessageBox.information(self, "Report Generated", f"Sales report generated successfully.\n\n{result}")
+                
+                # Create a "View Reports" button in a QMessageBox
+                msg_box = QMessageBox()
+                msg_box.setWindowTitle("Open Reports Folder")
+                msg_box.setText("Would you like to open the reports folder?")
+                msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+                response = msg_box.exec_()
+                
+                if response == QMessageBox.Yes:
+                    # Open the reports folder
+                    reports_dir = self.controller.get_reports_dir() if hasattr(self.controller, 'get_reports_dir') else "reports"
+                    os.startfile(reports_dir)
             else:
-                QMessageBox.warning(self, "Report Error", "Failed to generate sales report")
+                QMessageBox.warning(self, "Report Error", "Failed to generate sales report. Please try again later.")
                 
         except Exception as e:
             logger.error(f"Error generating sales report: {str(e)}")
@@ -614,18 +631,57 @@ class ReportsView(QWidget):
     def generate_inventory_report(self):
         """Generate and open inventory report PDF"""
         try:
-            # Show a waiting cursor or message
+            # Show processing dialog
             QMessageBox.information(self, "Generating Report", "Generating inventory report. This may take a moment...")
             
             # Generate the report
             report_path = self.controller.generate_inventory_report()
             
             if report_path:
-                QMessageBox.information(self, "Report Generated", f"Inventory report generated successfully: {report_path}")
-                # TODO: Open the report PDF if possible
+                QMessageBox.information(self, "Report Generated", f"Inventory report generated successfully.\n\nSaved to: {report_path}")
+                
+                # Create a "View Reports" button in a QMessageBox
+                msg_box = QMessageBox()
+                msg_box.setWindowTitle("Open Reports Folder")
+                msg_box.setText("Would you like to open the reports folder?")
+                msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+                response = msg_box.exec_()
+                
+                if response == QMessageBox.Yes:
+                    # Open the reports folder
+                    reports_dir = os.path.dirname(report_path)
+                    os.startfile(reports_dir)
             else:
-                QMessageBox.warning(self, "Report Error", "Failed to generate inventory report. No items found or error occurred.")
+                QMessageBox.warning(self, "Report Error", "Failed to generate inventory report. No inventory items found or an error occurred.")
                 
         except Exception as e:
             logger.error(f"Error generating inventory report: {str(e)}")
             QMessageBox.critical(self, "Report Error", f"Error generating report: {str(e)}")
+    
+    def generate_financial_report(self):
+        """Generate financial report"""
+        period = self.get_selected_period()
+        period_name = self.period_combo.currentText()
+        
+        QMessageBox.information(
+            self, 
+            "Financial Report", 
+            f"Financial report generation for {period_name} will be implemented in a future update.\n\n"
+            f"Current financial summary:\n"
+            f"- Total Sales: ${self.profit_card.value_label.text().replace('$', '')}\n"
+            f"- Total Expenses: ${self.expenses_card.value_label.text().replace('$', '')}\n"
+            f"- Profit Margin: {self.profit_margin_label.text().replace('Profit Margin: ', '')}"
+        )
+    
+    def generate_customer_report(self):
+        """Generate customer report"""
+        QMessageBox.information(
+            self, 
+            "Customer Report", 
+            "Customer report generation will be implemented in a future update.\n\n"
+            "This report will include:\n"
+            "- Customer purchase history\n"
+            "- Top customers by sales volume\n"
+            "- Customer loyalty metrics\n"
+            "- Outstanding customer balances"
+        )

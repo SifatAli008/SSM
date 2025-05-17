@@ -1,10 +1,10 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QFrame, QScrollArea, QStackedLayout,
-    QSizePolicy, QGraphicsDropShadowEffect
+    QSizePolicy, QGraphicsDropShadowEffect, QMessageBox
 )
 from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, QTimer, pyqtSignal
-from PyQt5.QtGui import QFont, QColor, QIcon
+from PyQt5.QtGui import QFont, QColor, QIcon, QPainter, QPen, QBrush
 
 # Import our custom components
 from app.views.widgets.components import Card, Button, PageHeader
@@ -27,6 +27,7 @@ class DashboardPage(QWidget):
         super().__init__(parent)
         self.init_ui()
         self.setup_animations()
+        self.update_recent_activities()  # Initialize with recent activities
 
 
     def setup_animations(self):
@@ -68,28 +69,6 @@ class DashboardPage(QWidget):
         content_layout = QVBoxLayout(content_widget)
         content_layout.setContentsMargins(20, 20, 20, 20)
         content_layout.setSpacing(30)
-
-        # Add alert notifications at the top
-        alert_card = Card()
-        alert_layout = QHBoxLayout()
-        alert_layout.setContentsMargins(15, 10, 15, 10)
-        alert_layout.setSpacing(18)
-        
-        alert_items = [
-            ("ℹ️", "<b>Low Stock:</b> 3 Items", ThemeManager.get_color("primary")),
-            ("⚠️", "<b>Pending Orders:</b> 2", ThemeManager.get_color("warning")),
-            ("🛡️", "<b>Security Alert:</b> 1", ThemeManager.get_color("danger"))
-        ]
-        
-        for icon, text, color in alert_items:
-            icon_label = QLabel(f"<span style='font-size:18px;color:{color};'>{icon}</span>")
-            text_label = QLabel(text)
-            alert_layout.addWidget(icon_label)
-            alert_layout.addWidget(text_label)
-        
-        alert_layout.addStretch()
-        alert_card.layout.addLayout(alert_layout)
-        content_layout.addWidget(alert_card)
 
         # Page header
         header = PageHeader("Dashboard Overview", "View and manage your business at a glance")
@@ -193,57 +172,13 @@ class DashboardPage(QWidget):
         dashboard.add_detail_section(actions_section)
         
         # Recent activity section
-        activity_section = Card("Recent Activity")
-        activity_layout = QVBoxLayout()
-        activity_layout.setContentsMargins(15, 5, 15, 15)
+        self.activity_section = Card("Recent Activity")
+        self.activity_layout = QVBoxLayout()
+        self.activity_layout.setContentsMargins(15, 5, 15, 15)
         
-        # Activity items
-        activities = [
-            ("💰", "New sale completed", "$120.50", "10 minutes ago"),
-            ("📦", "Inventory updated", "25 items", "30 minutes ago"),
-            ("👤", "New customer added", "John Smith", "1 hour ago"),
-            ("⚠️", "Low stock alert", "Printer Paper", "2 hours ago")
-        ]
-        
-        for icon, title, value, time in activities:
-            item_layout = QHBoxLayout()
-            
-            # Icon
-            icon_label = QLabel(icon)
-            icon_label.setFont(QFont(ThemeManager.FONTS["family"], 16))
-            item_layout.addWidget(icon_label)
-            
-            # Details
-            details_layout = QVBoxLayout()
-            title_label = QLabel(title)
-            title_label.setFont(QFont(ThemeManager.FONTS["family"], 12, QFont.Bold))
-            details_layout.addWidget(title_label)
-            
-            value_label = QLabel(value)
-            value_label.setFont(QFont(ThemeManager.FONTS["family"], 11))
-            value_label.setStyleSheet(f"color: {ThemeManager.get_color('text_secondary')};")
-            details_layout.addWidget(value_label)
-            
-            item_layout.addLayout(details_layout)
-            item_layout.addStretch()
-            
-            # Time
-            time_label = QLabel(time)
-            time_label.setFont(QFont(ThemeManager.FONTS["family"], 10))
-            time_label.setStyleSheet(f"color: {ThemeManager.get_color('text_secondary')};")
-            item_layout.addWidget(time_label)
-            
-            activity_layout.addLayout(item_layout)
-            
-            # Add separator except for last item
-            if activities.index((icon, title, value, time)) < len(activities) - 1:
-                separator = QFrame()
-                separator.setFrameShape(QFrame.HLine)
-                separator.setStyleSheet(f"background-color: {ThemeManager.get_color('border')};")
-                activity_layout.addWidget(separator)
-        
-        activity_section.layout.addLayout(activity_layout)
-        dashboard.add_detail_section(activity_section)
+        # Add activity layout to card
+        self.activity_section.layout.addLayout(self.activity_layout)
+        dashboard.add_detail_section(self.activity_section)
         
         # Add dashboard to content layout
         content_layout.addWidget(dashboard)
@@ -259,8 +194,198 @@ class DashboardPage(QWidget):
         main_layout.addWidget(scroll_area)
         
         # Connect signals
-        inventory_btn.clicked.connect(lambda: self.parent().change_page(1))
-        sales_btn.clicked.connect(lambda: self.parent().change_page(2))
-        customers_btn.clicked.connect(lambda: self.parent().change_page(3))
-        reports_btn.clicked.connect(lambda: self.parent().change_page(5))
+        inventory_btn.clicked.connect(lambda: self.navigate_to_page(1))
+        sales_btn.clicked.connect(lambda: self.navigate_to_page(2))
+        customers_btn.clicked.connect(lambda: self.navigate_to_page(3))
+        reports_btn.clicked.connect(self.generate_report)
+
+    def get_main_window(self):
+        """
+        Get the main window from the parent hierarchy
+        """
+        parent = self.parent()
+        while parent and not hasattr(parent, 'change_page'):
+            parent = parent.parent()
+        return parent
+
+    def navigate_to_page(self, page_index):
+        """
+        Navigate to a page through the main window
+        """
+        main_window = self.get_main_window()
+        if main_window and hasattr(main_window, 'change_page'):
+            main_window.change_page(page_index)
+        else:
+            print("Cannot navigate: Main window not found or no change_page method.")
+
+    def generate_report(self):
+        """Navigate to reports page and show report generation dialog"""
+        # First navigate to reports page
+        self.navigate_to_page(4)
+        
+        # After a short delay to ensure the page is loaded, show report options
+        QTimer.singleShot(100, self.show_report_options)
+    
+    def show_report_options(self):
+        """Show report generation options"""
+        msg = QMessageBox()
+        msg.setWindowTitle("Generate Report")
+        msg.setText("Select the type of report you want to generate:")
+        
+        # Add report type buttons
+        sales_btn = msg.addButton("Sales Report", QMessageBox.ActionRole)
+        inventory_btn = msg.addButton("Inventory Report", QMessageBox.ActionRole)
+        financial_btn = msg.addButton("Financial Report", QMessageBox.ActionRole)
+        cancel_btn = msg.addButton("Cancel", QMessageBox.RejectRole)
+        
+        msg.exec_()
+        
+        # Find the reports page to call its methods
+        clicked_btn = msg.clickedButton()
+        main_window = self.get_main_window()
+        
+        if not main_window:
+            QMessageBox.warning(self, "Error", "Could not access reports page")
+            return
+            
+        # Find the reports view in the content stack
+        reports_view = None
+        for i in range(main_window.content_stack.count()):
+            widget = main_window.content_stack.widget(i)
+            if hasattr(widget, 'generate_sales_report'):
+                reports_view = widget
+                break
+        
+        if not reports_view:
+            QMessageBox.warning(self, "Error", "Reports page not found")
+            return
+            
+        # Call the appropriate method based on button clicked
+        if clicked_btn == sales_btn:
+            reports_view.generate_sales_report()
+        elif clicked_btn == inventory_btn:
+            reports_view.generate_inventory_report()
+        elif clicked_btn == financial_btn:
+            reports_view.generate_financial_report()
+
+    def update_recent_activities(self):
+        """Update the recent activities section with fresh data"""
+        # Clear existing activities
+        for i in reversed(range(self.activity_layout.count())):
+            item = self.activity_layout.itemAt(i)
+            if item:
+                widget = item.widget()
+                if widget:
+                    widget.deleteLater()
+                else:
+                    # If it's a layout, recursively remove all items
+                    self.clear_layout(item.layout())
+                    self.activity_layout.removeItem(item)
+        
+        # Add new activity items - in a real app, this would come from a database
+        activities = [
+            ("💰", "New sale completed", "$120.50", "10 minutes ago"),
+            ("📦", "Inventory updated", "25 items", "30 minutes ago"),
+            ("👤", "New customer added", "John Smith", "1 hour ago"),
+            ("⚠️", "Low stock alert", "Printer Paper", "2 hours ago")
+        ]
+        
+        # Create activity items with enhanced styling
+        for icon, title, value, time in activities:
+            # Create a container widget for each activity item
+            activity_item = QWidget()
+            activity_item.setObjectName("activity-item")
+            activity_item.setStyleSheet("""
+                #activity-item {
+                    border-bottom: 1px solid #e0e0e0;
+                    padding: 10px 5px;
+                    background-color: transparent;
+                }
+                #activity-item:hover {
+                    background-color: #f5f5f5;
+                }
+            """)
+            
+            item_layout = QHBoxLayout(activity_item)
+            item_layout.setContentsMargins(8, 12, 8, 12)
+            item_layout.setSpacing(15)
+            
+            # Create icon container with colored circle background
+            icon_container = QWidget()
+            icon_container.setFixedSize(36, 36)
+            icon_container.setStyleSheet(f"""
+                background-color: {self.get_icon_background_color(icon)};
+                border-radius: 18px;
+                color: white;
+                font-size: 18px;
+            """)
+            
+            # Icon
+            icon_layout = QVBoxLayout(icon_container)
+            icon_layout.setContentsMargins(0, 0, 0, 0)
+            icon_layout.setAlignment(Qt.AlignCenter)
+            
+            icon_label = QLabel(icon)
+            icon_label.setAlignment(Qt.AlignCenter)
+            icon_label.setStyleSheet("background-color: transparent;")
+            icon_layout.addWidget(icon_label)
+            
+            item_layout.addWidget(icon_container)
+            
+            # Details
+            details_layout = QVBoxLayout()
+            details_layout.setSpacing(4)
+            
+            title_label = QLabel(title)
+            title_label.setFont(QFont(ThemeManager.FONTS["family"], 12, QFont.Bold))
+            details_layout.addWidget(title_label)
+            
+            value_label = QLabel(value)
+            value_label.setFont(QFont(ThemeManager.FONTS["family"], 11))
+            value_label.setStyleSheet(f"color: {ThemeManager.get_color('text_secondary')};")
+            details_layout.addWidget(value_label)
+            
+            item_layout.addLayout(details_layout, 1)  # Add stretch factor to details
+            
+            # Time with right alignment
+            time_container = QWidget()
+            time_layout = QVBoxLayout(time_container)
+            time_layout.setContentsMargins(0, 0, 0, 0)
+            time_layout.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            
+            time_label = QLabel(time)
+            time_label.setFont(QFont(ThemeManager.FONTS["family"], 10))
+            time_label.setStyleSheet(f"color: {ThemeManager.get_color('text_secondary')};")
+            time_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            time_layout.addWidget(time_label)
+            
+            item_layout.addWidget(time_container)
+            
+            # Add the activity item to the main layout
+            self.activity_layout.addWidget(activity_item)
+    
+    def get_icon_background_color(self, icon):
+        """Return an appropriate background color based on icon type"""
+        if icon == "💰":  # Sales
+            return ThemeManager.get_color("success")
+        elif icon == "📦":  # Inventory
+            return ThemeManager.get_color("primary")
+        elif icon == "👤":  # Customer
+            return ThemeManager.get_color("accent")
+        elif icon == "⚠️":  # Alert
+            return ThemeManager.get_color("warning")
+        else:
+            return ThemeManager.get_color("info")
+
+    def clear_layout(self, layout):
+        """Recursively clear a layout"""
+        if layout is None:
+            return
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+            else:
+                self.clear_layout(item.layout())
 

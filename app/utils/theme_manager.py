@@ -10,7 +10,7 @@ from enum import Enum
 class ThemeType(Enum):
     """Enum for available themes"""
     LIGHT = "light"
-    # Removed other themes to keep only Light theme
+    # Only Light theme is supported
 
 class ThemeManager:
     """Centralized theme management for consistent UI appearance"""
@@ -82,13 +82,13 @@ class ThemeManager:
         instance = cls()
         instance._current_theme = ThemeType.LIGHT  # Always set to Light theme
         
-        # Apply light theme regardless of the input
+        # Apply light theme
         cls._apply_light_theme()
     
     @classmethod
     def _apply_light_theme(cls):
         """Apply light theme colors"""
-        # Just apply the app stylesheet since colors are already set
+        # Use default colors - already defined
         cls._apply_app_stylesheet()
     
     @classmethod
@@ -284,6 +284,10 @@ class ThemeManager:
                 padding-right: 20px;
                 color: {c["text_primary"]};
                 background-color: {c["card"]};
+                min-height: 36px;
+                padding: 0px 10px;
+                selection-background-color: {c["primary"]};
+                selection-color: white;
             }}
             
             QComboBox::drop-down {{
@@ -291,6 +295,15 @@ class ThemeManager:
                 subcontrol-position: top right;
                 border-left: 1px solid {c["border"]};
                 width: 20px;
+                border-top-right-radius: {cls.BORDER_RADIUS['small']}px;
+                border-bottom-right-radius: {cls.BORDER_RADIUS['small']}px;
+                background: white;
+            }}
+            
+            QComboBox::down-arrow {{
+                image: url(app/assets/icons/down-arrow.png);
+                width: 12px;
+                height: 12px;
             }}
             
             QComboBox::drop-down:on {{
@@ -298,19 +311,25 @@ class ThemeManager:
             }}
             
             QComboBox QAbstractItemView {{
-                background-color: {c["card"]};
+                background-color: white;
                 border: 1px solid {c["border"]};
+                color: #222222;
                 selection-background-color: {c["primary"]};
                 selection-color: white;
-                color: {c["text_primary"]};
                 outline: none;
+                padding: 5px 0px;
+                border-radius: {cls.BORDER_RADIUS['small']}px;
+                min-height: 100px;
+                min-width: 100px;
+                margin-top: 5px;
             }}
             
             QComboBox QAbstractItemView::item {{
-                background-color: {c["card"]};
-                color: {c["text_primary"]};
-                padding: 6px;
-                min-height: 24px;
+                background-color: white;
+                color: #222222;
+                min-height: 30px;
+                padding: 5px 10px;
+                border-bottom: 1px solid {c["border"]};
             }}
             
             QComboBox QAbstractItemView::item:selected {{

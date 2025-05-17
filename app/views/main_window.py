@@ -185,8 +185,8 @@ class MainWindow(QMainWindow):
         self.add_inventory_page()
         self.add_sales_page()
         self.add_customers_page()
-        self.add_suppliers_page()
         self.add_reports_page()
+        self.add_settings_page()
 
         # Set active page
         self.content_stack.setCurrentIndex(0)
@@ -203,8 +203,8 @@ class MainWindow(QMainWindow):
             "inventory": {"title": "Inventory", "icon": "📦"},
             "sales": {"title": "Sales", "icon": "💰"},
             "customers": {"title": "Customers", "icon": "👥"},
-            "suppliers": {"title": "Suppliers", "icon": "🏭"},
-            "reports": {"title": "Reports", "icon": "📊"}
+            "reports": {"title": "Reports", "icon": "📊"},
+            "settings": {"title": "Settings", "icon": "⚙️"}
         }
         
         # Set up navigation
@@ -220,8 +220,8 @@ class MainWindow(QMainWindow):
                 initials = "".join(name[0].upper() for name in self.current_user.full_name.split(' ')[:2])
                 sidebar.profile_icon.setText(initials)
         
-        # Connect settings button
-        sidebar.settings_button.clicked.connect(self.show_settings)
+        # Settings button now points to the settings page
+        sidebar.settings_button.clicked.connect(lambda: self.change_page(5))
         
         return sidebar
 
@@ -232,8 +232,8 @@ class MainWindow(QMainWindow):
             "inventory": 1,
             "sales": 2,
             "customers": 3,
-            "suppliers": 4,
-            "reports": 5
+            "reports": 4,
+            "settings": 5
         }
         
         # Change to the selected page
@@ -329,8 +329,8 @@ class MainWindow(QMainWindow):
             "Inventory Management",
             "Sales & Orders",
             "Customer Management",
-            "Supplier Management",
-            "Reports & Analytics"
+            "Reports & Analytics",
+            "Application Settings"
         ]
         
         if 0 <= index < len(page_titles):
@@ -342,8 +342,8 @@ class MainWindow(QMainWindow):
             "inventory",
             "sales", 
             "customers",
-            "suppliers",
-            "reports"
+            "reports",
+            "settings"
         ]
         
         if 0 <= index < len(page_ids):
@@ -362,18 +362,21 @@ class MainWindow(QMainWindow):
         self.content_stack.addWidget(dashboard)
 
     def handle_add_product_from_dashboard(self):
-        # Switch to inventory page
-        inventory_idx = 1
+        # Find the inventory page index
+        inventory_idx = -1
         for i in range(self.content_stack.count()):
             if isinstance(self.content_stack.widget(i), InventoryView):
                 inventory_idx = i
                 break
-                
-        # Change to inventory page and trigger add product
-        self.change_page(inventory_idx)
-        inventory_page = self.content_stack.widget(inventory_idx)
-        if hasattr(inventory_page, 'show_add_product_dialog'):
-            inventory_page.show_add_product_dialog()
+        
+        # If inventory page found, change to it and trigger add product
+        if inventory_idx >= 0:
+            self.change_page(inventory_idx)
+            inventory_page = self.content_stack.widget(inventory_idx)
+            if hasattr(inventory_page, 'show_add_product_dialog'):
+                inventory_page.show_add_product_dialog()
+        else:
+            self.show_alert("Inventory page not found", "error")
 
     def add_inventory_page(self):
         # Create inventory page
@@ -390,34 +393,16 @@ class MainWindow(QMainWindow):
         customers_view = CustomerView()
         self.content_stack.addWidget(customers_view)
 
-    def add_suppliers_page(self):
-        # Create placeholder for suppliers page
-        suppliers_view = QWidget()
-        layout = QVBoxLayout(suppliers_view)
-        
-        # Create page header using our component
-        header = PageHeader("Supplier Management", "Manage your product suppliers")
-        
-        # Add action button
-        add_btn = Button("Add Supplier", variant="primary")
-        header.add_action(add_btn)
-        
-        # Create page content
-        content = QLabel("Suppliers management coming soon...")
-        content.setAlignment(Qt.AlignCenter)
-        content.setFont(QFont(ThemeManager.FONTS["family"], ThemeManager.FONTS["size_large"]))
-        
-        # Layout components
-        layout.addWidget(header)
-        layout.addWidget(content)
-        layout.addStretch()
-        
-        self.content_stack.addWidget(suppliers_view)
-
     def add_reports_page(self):
         # Create reports page using ReportsView
         reports_view = ReportsView()
         self.content_stack.addWidget(reports_view)
+
+    def add_settings_page(self):
+        """Create dedicated settings page"""
+        from app.views.settings_view import SettingsView
+        settings_view = SettingsView(self)
+        self.content_stack.addWidget(settings_view)
 
     def logout(self):
         # Ask for confirmation before logout
@@ -432,7 +417,8 @@ class MainWindow(QMainWindow):
         self.logout_requested.emit()
         
     def show_settings(self):
-        # Display theme selection dialog
+        """Display the theme selection dialog and apply chosen theme"""
+        # Create a themed dialog for settings
         themes = [
             {"name": "Light Theme", "type": ThemeType.LIGHT},
             {"name": "Dark Theme", "type": ThemeType.DARK},
@@ -443,18 +429,27 @@ class MainWindow(QMainWindow):
         msg.setWindowTitle("Application Settings")
         msg.setText("Select a theme:")
         
+        # Add theme buttons
+        theme_buttons = []
         for theme in themes:
             button = msg.addButton(theme["name"], QMessageBox.ActionRole)
             button.setProperty("theme_type", theme["type"])
+            theme_buttons.append(button)
         
         cancel_button = msg.addButton("Cancel", QMessageBox.RejectRole)
         
         msg.exec_()
         
+        # Handle button click
         clicked_button = msg.clickedButton()
         if clicked_button and clicked_button != cancel_button:
             theme_type = clicked_button.property("theme_type")
+            
+            # Apply the selected theme
             if theme_type:
-                ThemeManager.apply_theme(theme_type)
-                self.show_alert(f"Theme changed to {clicked_button.text()}", "success")
+                try:
+                    ThemeManager.apply_theme(theme_type)
+                    self.show_alert(f"Theme changed to {clicked_button.text()}", "success")
+                except Exception as e:
+                    self.show_alert(f"Error changing theme: {str(e)}", "error")
 

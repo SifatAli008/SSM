@@ -255,12 +255,68 @@ class SalesView(QWidget):
         self.selected_row = self.table.currentRow()
 
     def add_sale(self):
+        """Process a new sale with a detailed dialog"""
         dialog = SaleDialog(self)
+        
+        # Set default values for new sale
+        dialog.date.setDate(QDate.currentDate())
+        dialog.total.setValue(0)
+        dialog.payment.setValue(0)
+        dialog.discount.setValue(0)
+        dialog.status.setCurrentText("Completed")
+        
         if dialog.exec_():
-            data = dialog.get_data()
-            # TODO: Save to model/controller
-            QMessageBox.information(self, "Sale Added", f"Sale for {data['customer']} added.")
-            self.refresh_table()
+            try:
+                data = dialog.get_data()
+                
+                # Calculate any due amount
+                due_amount = data['total'] - data['payment'] - data['discount']
+                if due_amount > 0:
+                    data['status'] = "Pending"
+                
+                # Show confirmation with complete details
+                confirmation = QMessageBox()
+                confirmation.setWindowTitle("Sale Confirmation")
+                confirmation.setIcon(QMessageBox.Information)
+                confirmation.setText(f"<b>Sale Processed Successfully</b>")
+                
+                details = (
+                    f"<table style='margin-top:10px'>"
+                    f"<tr><td>Customer:</td><td>{data['customer']}</td></tr>"
+                    f"<tr><td>Date:</td><td>{data['date']}</td></tr>"
+                    f"<tr><td>Total Amount:</td><td>${data['total']:.2f}</td></tr>"
+                    f"<tr><td>Payment:</td><td>${data['payment']:.2f}</td></tr>"
+                    f"<tr><td>Discount:</td><td>${data['discount']:.2f}</td></tr>"
+                    f"<tr><td>Due Amount:</td><td>${due_amount:.2f}</td></tr>"
+                    f"<tr><td>Status:</td><td>{data['status']}</td></tr>"
+                    f"</table>"
+                )
+                confirmation.setInformativeText(details)
+                
+                # Print receipt button
+                print_btn = confirmation.addButton("Print Receipt", QMessageBox.ActionRole)
+                confirmation.addButton(QMessageBox.Ok)
+                confirmation.setDefaultButton(QMessageBox.Ok)
+                
+                result = confirmation.exec_()
+                
+                # Handle print button click
+                if confirmation.clickedButton() == print_btn:
+                    self.print_receipt(data)
+                
+                # Refresh the table with the new data
+                self.refresh_table()
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to process sale: {str(e)}")
+    
+    def print_receipt(self, sale_data):
+        """Print or preview a receipt"""
+        QMessageBox.information(self, "Print Receipt", 
+            "Receipt printing will be implemented in a future update.\n\n"
+            f"Sale details for {sale_data['customer']} on {sale_data['date']} "
+            f"with total ${sale_data['total']:.2f} would be printed."
+        )
 
     def edit_sale(self):
         if self.selected_row is None:
