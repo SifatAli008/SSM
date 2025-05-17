@@ -894,4 +894,18 @@ class CustomerView(QWidget):
         self.invoice_discount.clear()
         self.invoice_payment.clear()
         self.invoice_due.clear()
-        self.selected_row = None 
+        self.selected_row = None
+
+    def refresh_data(self):
+        """Refresh all customer data to ensure real-time updates"""
+        print("🔄 Refreshing customer data...")
+        
+        # Refresh the customer table
+        if hasattr(self, 'customer_model') and self.customer_model:
+            self.load_customers()
+            
+        # Refresh any summary cards or statistics
+        if hasattr(self, 'update_summary_cards'):
+            self.update_summary_cards()
+            
+        return True 

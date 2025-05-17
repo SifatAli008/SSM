@@ -1,0 +1,3 @@
+# Import all widget components
+from app.views.widgets.enhanced_activity import EnhancedActivity
+# Keep any existing imports... 

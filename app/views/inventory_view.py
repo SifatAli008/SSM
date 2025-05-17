@@ -680,6 +680,24 @@ class InventoryView(QWidget):
 
         self.proxy_model.setFilterFixedString(filter_string)
 
+    def refresh_data(self):
+        """Refresh all inventory data to ensure real-time updates"""
+        print("🔄 Refreshing inventory data...")
+        if self.controller:
+            # Refresh the model data
+            self.controller.model.select()
+            
+            # Update summary cards
+            self.refresh_from_controller()
+            
+            # If a filter is active, reapply it
+            if hasattr(self, 'filter_text') and self.filter_text.text():
+                self.apply_filters()
+        else:
+            print("⚠️ No controller available for refresh")
+            
+        return True
+
 class ProductDialog(QDialog):
     def __init__(self, parent=None, title="Product", name="", qty=0, buying_price=0.0, selling_price=0.0, details="", category="Electronics"):
         super().__init__(parent)

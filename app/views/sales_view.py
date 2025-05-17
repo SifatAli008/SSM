@@ -421,5 +421,19 @@ class SalesView(QWidget):
         print(f'Card clicked: {card_name}')
         # TODO: Implement card click actions
 
+    def refresh_data(self):
+        """Refresh all sales data to ensure real-time updates"""
+        print("🔄 Refreshing sales data...")
+        
+        # Refresh the table data
+        if hasattr(self, 'sales_table') and self.sales_table:
+            self.load_sales_data()
+            
+        # Refresh any summary cards or statistics
+        if hasattr(self, 'update_summary_cards'):
+            self.update_summary_cards()
+            
+        return True
+
 # NOTE: The code you provided was cut off at 'refresh_items_table'.
 # Please provide the rest of the code for a full replacement if needed.

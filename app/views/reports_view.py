@@ -567,34 +567,18 @@ class ReportsView(QWidget):
             QMessageBox.warning(self, "Data Error", f"Failed to load some report data: {str(e)}")
     
     def refresh_data(self):
-        """Refresh data with visual feedback"""
-        try:
-            # Show a waiting cursor
-            QApplication.setOverrideCursor(Qt.WaitCursor)
+        """Refresh all report data to ensure real-time updates"""
+        print("🔄 Refreshing reports data...")
+        
+        # Refresh the currently selected report
+        if hasattr(self, 'current_report_type') and self.current_report_type:
+            self.generate_report(self.current_report_type)
             
-            # Load the data
-            self.load_data()
+        # Refresh summary metrics
+        if hasattr(self, 'update_summary_metrics'):
+            self.update_summary_metrics()
             
-            # Restore the cursor
-            QApplication.restoreOverrideCursor()
-            
-            # Show success message
-            self.show_refresh_success()
-        except Exception as e:
-            # Restore the cursor in case of error
-            QApplication.restoreOverrideCursor()
-            logger.error(f"Error refreshing data: {str(e)}")
-            QMessageBox.warning(self, "Refresh Error", f"Failed to refresh data: {str(e)}")
-    
-    def show_refresh_success(self):
-        """Show a brief success message for data refresh"""
-        msg = QMessageBox()
-        msg.setWindowTitle("Data Refreshed")
-        msg.setText("Report data has been refreshed successfully.")
-        msg.setIcon(QMessageBox.Information)
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.setDefaultButton(QMessageBox.Ok)
-        msg.exec_()
+        return True
     
     def generate_sales_report(self):
         """Generate and open sales report PDF"""

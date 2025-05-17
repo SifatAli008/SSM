@@ -20,6 +20,7 @@ from app.views.reports_view import ReportsView
 from app.views.widgets.components import Sidebar, Button, Card, PageHeader
 from app.views.widgets.layouts import PageLayout
 from app.utils.theme_manager import ThemeManager, ThemeType
+from app.utils.event_system import global_event_system
 
 # Keep the AlertWidget for now - we'll refactor it later
 class AlertWidget(QWidget):
@@ -140,6 +141,9 @@ class MainWindow(QMainWindow):
         
         # Initialize sidebar with animation
         self.setup_animations()
+        
+        # Setup event listeners for real-time updates
+        self.setup_event_listeners()
 
     def setup_animations(self):
         self.fade_animations = []
@@ -452,4 +456,63 @@ class MainWindow(QMainWindow):
                     self.show_alert(f"Theme changed to {clicked_button.text()}", "success")
                 except Exception as e:
                     self.show_alert(f"Error changing theme: {str(e)}", "error")
+
+    def setup_event_listeners(self):
+        """Setup listeners for the global event system"""
+        # Update inventory page when inventory data changes
+        global_event_system.inventory_updated.connect(self.refresh_inventory_page)
+        
+        # Update sales page when sales data changes
+        global_event_system.sales_updated.connect(self.refresh_sales_page)
+        
+        # Update customer page when customer data changes
+        global_event_system.customer_updated.connect(self.refresh_customer_page)
+        
+        # Update all reports when data changes
+        global_event_system.inventory_updated.connect(self.refresh_reports_page)
+        global_event_system.sales_updated.connect(self.refresh_reports_page)
+        global_event_system.customer_updated.connect(self.refresh_reports_page)
+        
+        # Update settings when settings change
+        global_event_system.settings_updated.connect(self.refresh_settings_page)
+
+    def refresh_inventory_page(self):
+        """Refresh the inventory page data"""
+        if hasattr(self, 'inventory_page') and self.inventory_page:
+            self.inventory_page.refresh_data()
+            # Show notification if current page is not inventory
+            if self.content_stack.currentIndex() != 1:
+                self.show_alert("Inventory data updated", "info")
+
+    def refresh_sales_page(self):
+        """Refresh the sales page data"""
+        if hasattr(self, 'sales_page') and self.sales_page:
+            self.sales_page.refresh_data()
+            # Show notification if current page is not sales
+            if self.content_stack.currentIndex() != 2:
+                self.show_alert("Sales data updated", "info")
+
+    def refresh_customer_page(self):
+        """Refresh the customer page data"""
+        if hasattr(self, 'customer_page') and self.customer_page:
+            self.customer_page.refresh_data()
+            # Show notification if current page is not customers
+            if self.content_stack.currentIndex() != 3:
+                self.show_alert("Customer data updated", "info")
+
+    def refresh_reports_page(self):
+        """Refresh the reports page data"""
+        if hasattr(self, 'reports_page') and self.reports_page:
+            self.reports_page.refresh_data()
+            # Only show notification if current page is reports
+            if self.content_stack.currentIndex() == 4:
+                self.show_alert("Reports data updated", "info")
+
+    def refresh_settings_page(self):
+        """Refresh the settings page"""
+        if hasattr(self, 'settings_page') and self.settings_page:
+            self.settings_page.refresh_settings()
+            # Only show notification if current page is settings
+            if self.content_stack.currentIndex() == 5:
+                self.show_alert("Settings updated", "info")
 

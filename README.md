@@ -35,9 +35,15 @@ A comprehensive desktop application for retail store management built with Pytho
 - Role-based access control
 - User activity tracking
 
-## UI Features
+## Technical Features
 
-The application features a modern, responsive UI with:
+### Modern Architecture
+- **Event-driven architecture** for real-time data updates across components
+- **Data caching system** for improved performance
+- Comprehensive **automated testing** framework
+- Clean **MVC design pattern** for separation of concerns
+
+### UI Features
 - Consistent styling and component design across all pages
 - Standardized button styling with action-based colors
 - Responsive layouts that adapt to different screen sizes
@@ -50,6 +56,9 @@ The application features a modern, responsive UI with:
 - MVC architecture for clean separation of concerns
 - SQLite database for data storage
 - PDF generation for reports and receipts
+- Event-based communication system for real-time updates
+- Performance optimization with data caching
+- Comprehensive test suite
 
 ## Getting Started
 
@@ -73,6 +82,20 @@ pip install -r requirements.txt
 ```bash
 python run.py
 ```
+
+### Testing
+Run the automated test suite to ensure everything is working properly:
+```bash
+python run_tests.py
+```
+
+## Documentation
+
+For more detailed documentation about specific components:
+
+- [Event System Documentation](README_EVENT_SYSTEM.md) - Details about the real-time event system
+- [API Reference](docs/API.md) - API documentation for developers
+- [User Guide](docs/USER_GUIDE.md) - Comprehensive guide for users
 
 ## License
 

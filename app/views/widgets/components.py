@@ -246,7 +246,7 @@ class Card(QFrame):
         # Apply styling
         self.setStyleSheet(f"""
             QFrame#card {{
-                background-color: {ThemeManager.get_color('card')};
+                background-color: #f8f9fa;
                 border-radius: {ThemeManager.BORDER_RADIUS['normal']}px;
                 border: 1px solid {ThemeManager.get_color('border')};
             }}

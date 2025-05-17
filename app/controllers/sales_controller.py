@@ -1,5 +1,6 @@
-from models.sales import SalesModel
+from app.models.sales import SalesModel
 from datetime import datetime
+from app.utils.event_system import global_event_system
 
 class SalesController:
     """Business logic for sales operations"""
@@ -22,7 +23,33 @@ class SalesController:
             due = kwargs.get('total_price', 0) - kwargs.get('discount', 0) - kwargs.get('payment_amount', 0)
             kwargs['due_amount'] = max(0, due)
         
-        return self.model.add_sale(**kwargs)
+        result = self.model.add_sale(**kwargs)
+        
+        # Notify the event system about the new sale
+        if result:
+            # Create payload with sale details for the event system
+            event_data = {
+                "action": "add",
+                "sale": {
+                    "invoice": kwargs.get('invoice_number', ''),
+                    "customer": kwargs.get('customer_name', 'Unknown customer'),
+                    "total": kwargs.get('total_price', 0),
+                    "payment": kwargs.get('payment_amount', 0),
+                    "discount": kwargs.get('discount', 0),
+                    "due": kwargs.get('due_amount', 0),
+                    "date": kwargs.get('date', '')
+                }
+            }
+            
+            global_event_system.notify_sales_update(event_data)
+            
+            # Also notify inventory update as sales affect inventory
+            global_event_system.notify_inventory_update({
+                "action": "sale_impact",
+                "sale_id": result
+            })
+            
+        return result
     
     def get_sales(self, search=None, start_date=None, end_date=None, limit=50, offset=0):
         """Get sales with filtering"""
@@ -45,11 +72,54 @@ class SalesController:
             due = total - discount - payment
             kwargs['due_amount'] = max(0, due)
         
-        return self.model.update_sale(sale_id, **kwargs)
+        result = self.model.update_sale(sale_id, **kwargs)
+        
+        # Notify the event system about the sale update
+        if result:
+            # Create payload with update details
+            event_data = {
+                "action": "update",
+                "sale": {
+                    "id": sale_id,
+                    "invoice": kwargs.get('invoice_number', ''),
+                    "customer": kwargs.get('customer_name', ''),
+                    "total": kwargs.get('total_price', 0),
+                    "payment": kwargs.get('payment_amount', 0),
+                    "discount": kwargs.get('discount', 0),
+                    "due": kwargs.get('due_amount', 0)
+                }
+            }
+            global_event_system.notify_sales_update(event_data)
+            
+        return result
     
     def delete_sale(self, sale_id):
         """Delete a sale"""
-        return self.model.delete_sale(sale_id)
+        # Get sale details before deletion for event notification
+        sale = self.get_sale_by_id(sale_id)
+        
+        result = self.model.delete_sale(sale_id)
+        
+        # Notify the event system about the sale deletion
+        if result:
+            # Create payload with deletion details
+            event_data = {
+                "action": "delete",
+                "sale": {
+                    "id": sale_id,
+                    "invoice": sale.get('invoice_number', ''),
+                    "customer": sale.get('customer_name', '')
+                }
+            }
+            global_event_system.notify_sales_update(event_data)
+            
+            # Sales deletion might affect inventory
+            global_event_system.notify_inventory_update({
+                "action": "sale_deleted",
+                "sale_id": sale_id
+            })
+            
+        return result
     
     def get_pending_invoices(self):
         """Get pending invoices"""

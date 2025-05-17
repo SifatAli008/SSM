@@ -13,6 +13,10 @@ class ReportsController:
         """Initialize the reports controller"""
         self.db = DatabaseManager()
         
+    def get_reports_dir(self):
+        """Return the path to the reports directory"""
+        return PDFGenerator.get_reports_dir()
+        
     def get_sales_summary(self, period="last_30_days"):
         """
         Get sales summary data for a specified period

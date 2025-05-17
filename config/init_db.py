@@ -43,14 +43,27 @@ def create_db():
         )
     ''')
     
-    # Check if sales table exists and has the total_amount column
+    # Create customers table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            phone TEXT,
+            email TEXT,
+            address TEXT,
+            notes TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Check if sales table exists and has the required columns
     cursor.execute("PRAGMA table_info(sales)")
     columns = cursor.fetchall()
-    has_total_amount = any(col[1] == 'total_amount' for col in columns)
+    column_names = [col[1] for col in columns]
     
-    # If sales table exists but doesn't have total_amount, drop and recreate it
-    if columns and not has_total_amount:
-        print("Existing sales table found without total_amount column. Recreating the table...")
+    # If sales table exists but doesn't have required columns, drop and recreate it
+    if columns and ('total_price' not in column_names or 'total_amount' not in column_names):
+        print("Existing sales table found without required columns. Recreating the table...")
         cursor.execute("DROP TABLE IF EXISTS sales")
         # Tables will be recreated below
     
@@ -62,11 +75,37 @@ def create_db():
             quantity INTEGER,
             sale_price REAL,
             total_amount REAL,
+            total_price REAL,
             customer_name TEXT,
+            customer_id INTEGER,
             sale_date TEXT,
-            FOREIGN KEY (inventory_id) REFERENCES inventory (id)
+            discount REAL DEFAULT 0,
+            payment_amount REAL DEFAULT 0,
+            payment_method TEXT DEFAULT 'Cash',
+            due_amount REAL DEFAULT 0,
+            status TEXT DEFAULT 'Completed',
+            notes TEXT,
+            FOREIGN KEY (inventory_id) REFERENCES inventory (id),
+            FOREIGN KEY (customer_id) REFERENCES customers (id)
         )
     ''')
+    
+    # Add sample customers if empty
+    cursor.execute("SELECT COUNT(*) FROM customers")
+    if cursor.fetchone()[0] == 0:
+        sample_customers = [
+            ("John Doe", "555-123-4567", "john.doe@example.com", "123 Main St", "Regular customer", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            ("Jane Smith", "555-987-6543", "jane.smith@example.com", "456 Oak Ave", "VIP customer", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            ("Bob Johnson", "555-555-5555", "bob.johnson@example.com", "789 Pine Blvd", "", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            ("Alice Brown", "555-111-2222", "alice.brown@example.com", "321 Elm St", "New customer", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            ("Charlie Wilson", "555-333-4444", "charlie.wilson@example.com", "654 Maple Dr", "", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        ]
+        
+        cursor.executemany('''
+            INSERT INTO customers (full_name, phone, email, address, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', sample_customers)
+        print("Added sample customer data")
     
     # Add sample inventory data if empty
     cursor.execute("SELECT COUNT(*) FROM inventory")
@@ -95,31 +134,54 @@ def create_db():
     if cursor.fetchone()[0] == 0:
         # Generate random sales data for the past 90 days
         sample_sales = []
-        customers = ["John Doe", "Jane Smith", "Bob Johnson", "Alice Brown", "Charlie Wilson", 
-                     "Emma Davis", "Michael Miller", "Olivia Wilson", "James Taylor", "Sophia White"]
+        
+        # Get customer IDs
+        cursor.execute("SELECT id, full_name FROM customers")
+        customers = cursor.fetchall()
         
         # Get inventory items
         cursor.execute("SELECT id, selling_price FROM inventory")
         inventory_items = cursor.fetchall()
         
-        if inventory_items:
+        if inventory_items and customers:
             # Generate sales for the past 90 days
             for i in range(90):
                 sale_date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d %H:%M:%S")
                 
                 # Generate 1-5 sales for each day
                 for _ in range(random.randint(1, 5)):
-                    # Select random inventory item
+                    # Select random inventory item and customer
                     item_id, selling_price = random.choice(inventory_items)
+                    customer_id, customer_name = random.choice(customers)
                     quantity = random.randint(1, 5)
-                    customer = random.choice(customers)
                     total_amount = quantity * selling_price
+                    total_price = total_amount  # Same as total_amount for simplicity
+                    discount = round(random.uniform(0, 0.1) * total_price, 2)  # 0-10% discount
+                    payment_amount = total_price - discount
                     
-                    sample_sales.append((item_id, quantity, selling_price, total_amount, customer, sale_date))
+                    sample_sales.append((
+                        item_id, 
+                        quantity, 
+                        selling_price, 
+                        total_amount,
+                        total_price,
+                        customer_name, 
+                        customer_id,
+                        sale_date,
+                        discount,
+                        payment_amount,
+                        'Cash',
+                        0,  # due amount
+                        'Completed'
+                    ))
             
             cursor.executemany('''
-                INSERT INTO sales (inventory_id, quantity, sale_price, total_amount, customer_name, sale_date)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO sales (
+                    inventory_id, quantity, sale_price, total_amount, total_price,
+                    customer_name, customer_id, sale_date, discount, payment_amount,
+                    payment_method, due_amount, status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', sample_sales)
             print(f"Added {len(sample_sales)} sample sales records")
 

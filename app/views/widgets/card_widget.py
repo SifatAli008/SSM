@@ -5,16 +5,23 @@ File: views/widgets/card_widget.py
 
 
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy, QGraphicsDropShadowEffect
-from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QIcon, QFont, QColor, QPalette
+from PyQt5.QtCore import Qt, QSize, pyqtSignal
+from PyQt5.QtGui import QIcon, QFont, QColor, QPalette, QCursor
 
 
 
 
 class CardWidget(QFrame):
-    def __init__(self, title, value, subtitle=None, icon=None, color=None):
+    # Define a signal that can be connected to
+    clicked = pyqtSignal()
+    
+    def __init__(self, title, value, subtitle=None, icon=None, color=None, clickable=True):
         super().__init__()
 
+        # Store internal state
+        self._clickable = clickable
+        self._hover = False
+        self._pressed = False
 
         self.setObjectName("card")
         self.setFrameShape(QFrame.StyledPanel)
@@ -23,6 +30,9 @@ class CardWidget(QFrame):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setStyleSheet(self.default_stylesheet())
 
+        # Make card clickable if specified
+        if clickable:
+            self.setCursor(Qt.PointingHandCursor)
 
         # Optional background color
         if color:
@@ -73,24 +83,99 @@ class CardWidget(QFrame):
 
 
         # Value
-        value_label = QLabel(str(value))
-        value_label.setObjectName("cardValue")
-        value_label.setFont(QFont("Segoe UI", 22, QFont.Bold))
-        value_label.setStyleSheet("color: #3498db;")
-        layout.addWidget(value_label)
+        self.value_label = QLabel(str(value))
+        self.value_label.setObjectName("cardValue")
+        self.value_label.setFont(QFont("Segoe UI", 22, QFont.Bold))
+        self.value_label.setStyleSheet("color: #3498db;")
+        layout.addWidget(self.value_label)
 
 
         # Subtitle
+        self.subtitle_label = None
         if subtitle:
-            subtitle_label = QLabel(subtitle)
-            subtitle_label.setObjectName("cardSubtitle")
-            subtitle_label.setFont(QFont("Segoe UI", 11))
-            subtitle_label.setStyleSheet("color: #7f8c8d;")
-            layout.addWidget(subtitle_label)
+            self.subtitle_label = QLabel(subtitle)
+            self.subtitle_label.setObjectName("cardSubtitle")
+            self.subtitle_label.setFont(QFont("Segoe UI", 11))
+            self.subtitle_label.setStyleSheet("color: #7f8c8d;")
+            layout.addWidget(self.subtitle_label)
+        else:
+            # Create an empty subtitle label to update later if needed
+            self.subtitle_label = QLabel("")
+            self.subtitle_label.setObjectName("cardSubtitle")
+            self.subtitle_label.setFont(QFont("Segoe UI", 11))
+            self.subtitle_label.setStyleSheet("color: #7f8c8d;")
+            self.subtitle_label.setVisible(False)
+            layout.addWidget(self.subtitle_label)
 
 
         layout.addStretch()
+        
+    def set_clickable(self, clickable):
+        """Set whether the card is clickable"""
+        self._clickable = clickable
+        if clickable:
+            self.setCursor(Qt.PointingHandCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
+            
+    def set_on_click(self, callback):
+        """Set a callback function to be called when the card is clicked"""
+        self.clicked.connect(callback)
+        
+    def update_values(self, value, subtitle=None):
+        """Update the card's value and subtitle dynamically"""
+        self.value_label.setText(str(value))
+        
+        if subtitle and self.subtitle_label:
+            self.subtitle_label.setText(str(subtitle))
+            self.subtitle_label.setVisible(True)
+        elif subtitle:
+            # Create subtitle label if it doesn't exist
+            self.subtitle_label = QLabel(subtitle)
+            self.subtitle_label.setObjectName("cardSubtitle")
+            self.subtitle_label.setFont(QFont("Segoe UI", 11))
+            self.subtitle_label.setStyleSheet("color: #7f8c8d;")
+            self.layout().insertWidget(2, self.subtitle_label)
+        elif self.subtitle_label:
+            self.subtitle_label.setVisible(False)
 
+    def mousePressEvent(self, event):
+        """Handle mouse press events for clickable cards"""
+        if self._clickable and event.button() == Qt.LeftButton:
+            self._pressed = True
+            self.setStyleSheet(self.pressed_stylesheet())
+            super().mousePressEvent(event)
+            
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release events for clickable cards"""
+        if self._clickable and self._pressed and event.button() == Qt.LeftButton:
+            self._pressed = False
+            # Only emit clicked if the release is within the widget
+            if self.rect().contains(event.pos()):
+                self.clicked.emit()
+            
+            # Restore hover state if still hovering
+            if self._hover:
+                self.setStyleSheet(self.hover_stylesheet())
+            else:
+                self.setStyleSheet(self.default_stylesheet())
+            
+        super().mouseReleaseEvent(event)
+            
+    def enterEvent(self, event):
+        """Handle mouse enter events for hover effects"""
+        if self._clickable:
+            self._hover = True
+            self.setStyleSheet(self.hover_stylesheet())
+        super().enterEvent(event)
+        
+    def leaveEvent(self, event):
+        """Handle mouse leave events to remove hover effects"""
+        if self._clickable:
+            self._hover = False
+            self._pressed = False
+            self.setStyleSheet(self.default_stylesheet())
+        super().leaveEvent(event)
 
     def default_stylesheet(self):
         return """
@@ -113,6 +198,54 @@ class CardWidget(QFrame):
 
         QLabel#cardValue {
             color: #3498db;
+        }
+
+
+        QLabel#cardSubtitle {
+            color: #7f8c8d;
+        }
+        """
+        
+    def hover_stylesheet(self):
+        return """
+        QFrame#card {
+            background-color: #f8f9fa;
+            border-radius: 12px;
+            border: 1px solid #3498db;
+        }
+
+
+        QLabel#cardTitle {
+            color: #2c3e50;
+        }
+
+
+        QLabel#cardValue {
+            color: #3498db;
+        }
+
+
+        QLabel#cardSubtitle {
+            color: #7f8c8d;
+        }
+        """
+        
+    def pressed_stylesheet(self):
+        return """
+        QFrame#card {
+            background-color: #ebf5fb;
+            border-radius: 12px;
+            border: 1px solid #2980b9;
+        }
+
+
+        QLabel#cardTitle {
+            color: #2c3e50;
+        }
+
+
+        QLabel#cardValue {
+            color: #2980b9;
         }
 
 

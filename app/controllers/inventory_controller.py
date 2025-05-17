@@ -5,6 +5,8 @@ import csv
 import datetime
 from app.utils.database import DatabaseManager
 from app.utils.logger import logger
+from app.utils.event_system import global_event_system
+from app.utils.cache_manager import global_cache
 
 class InventoryController:
     def __init__(self):
@@ -90,6 +92,22 @@ class InventoryController:
 
             if self.model.submitAll():
                 print(f"✅ Product '{name}' added successfully.")
+                
+                # Clear relevant caches when inventory changes
+                self._invalidate_caches()
+                
+                # Notify the event system about the change with product data
+                event_data = {
+                    "action": "add",
+                    "product": {
+                        "name": name,
+                        "quantity": quantity,
+                        "buying_price": buying_price,
+                        "selling_price": selling_price,
+                        "category": category
+                    }
+                }
+                global_event_system.notify_inventory_update(event_data)
                 return True
             else:
                 print(f"❌ Failed to submit new product: {self.model.lastError().text()}")
@@ -101,13 +119,29 @@ class InventoryController:
     def delete_item(self, row):
         """Deletes an item by row index."""
         try:
-            # Get item name for logging
+            # Get item data for event notification
+            item_id = self.model.data(self.model.index(row, 0))
             item_name = self.model.data(self.model.index(row, 1))
+            item_category = self.model.data(self.model.index(row, 3))
             
             # Remove the row
             success = self.model.removeRow(row)
             if success and self.model.submitAll():
                 print(f"🗑️ Product '{item_name}' deleted successfully.")
+                
+                # Clear relevant caches when inventory changes
+                self._invalidate_caches()
+                
+                # Notify the event system about the change with product data
+                event_data = {
+                    "action": "delete",
+                    "product": {
+                        "id": item_id,
+                        "name": item_name,
+                        "category": item_category
+                    }
+                }
+                global_event_system.notify_inventory_update(event_data)
                 return True
             else:
                 print(f"❌ Error deleting product: {self.model.lastError().text()}")
@@ -122,12 +156,18 @@ class InventoryController:
         for row in sorted(rows, reverse=True):  # Delete in reverse order to avoid index shifting
             if self.delete_item(row):
                 deleted_count += 1
+        
+        # Notify the event system about the change if any items were deleted
+        if deleted_count > 0:
+            global_event_system.notify_inventory_update()
+            
         return deleted_count
 
     def update_item(self, row, data, additional_data=None):
         """Updates an existing item at the specified row."""
         try:
-            # Get item name for logging
+            # Get item ID and name for event notification
+            item_id = self.model.data(self.model.index(row, 0))
             item_name = self.model.data(self.model.index(row, 1))
             
             # Update each field
@@ -148,6 +188,33 @@ class InventoryController:
             # Submit changes
             if self.model.submitAll():
                 print(f"✅ Product '{item_name}' updated successfully.")
+                
+                # Clear relevant caches when inventory changes
+                self._invalidate_caches()
+                
+                # Prepare event data with updated values
+                event_data = {
+                    "action": "update",
+                    "product": {
+                        "id": item_id,
+                        "name": item_name,
+                    }
+                }
+                
+                # Add updated data to event payload
+                for column, value in data.items():
+                    if column == 1:
+                        event_data["product"]["name"] = value
+                    elif column == 4:
+                        event_data["product"]["quantity"] = value
+                
+                # Add additional data if available
+                if additional_data:
+                    for key, value in additional_data.items():
+                        event_data["product"][key] = value
+                
+                # Notify the event system about the change
+                global_event_system.notify_inventory_update(event_data)
                 return True
             else:
                 print(f"❌ Error updating product: {self.model.lastError().text()}")
@@ -160,6 +227,8 @@ class InventoryController:
         """Refreshes the data from the database."""
         try:
             self.model.select()
+            # Clear all inventory caches when refreshing data
+            self._invalidate_caches()
             print("🔄 Data refreshed.")
             return True
         except Exception as e:
@@ -168,6 +237,13 @@ class InventoryController:
 
     def count_total_stock(self):
         """Counts the total stock across all inventory items."""
+        # Try to get from cache first
+        cache_key = "inventory:total_stock"
+        cached_value = global_cache.get(cache_key)
+        if cached_value is not None:
+            return cached_value
+            
+        # If not in cache, calculate from database
         total = 0
         for row in range(self.model.rowCount()):
             stock = self.model.data(self.model.index(row, 4))
@@ -176,10 +252,20 @@ class InventoryController:
                     total += int(stock)
                 except ValueError:
                     print(f"⚠️ Skipping invalid stock value at row {row}: {stock}")
+        
+        # Store in cache for 5 minutes
+        global_cache.set(cache_key, total, ttl_seconds=300)
         return total
 
     def count_low_stock(self, threshold=10):
         """Counts items with stock below the specified threshold."""
+        # Try to get from cache first
+        cache_key = f"inventory:low_stock:{threshold}"
+        cached_value = global_cache.get(cache_key)
+        if cached_value is not None:
+            return cached_value
+            
+        # If not in cache, calculate from database
         low = 0
         for row in range(self.model.rowCount()):
             stock = self.model.data(self.model.index(row, 4))
@@ -189,22 +275,89 @@ class InventoryController:
                         low += 1
                 except ValueError:
                     print(f"⚠️ Invalid stock at row {row}: {stock}")
+        
+        # Store in cache for 5 minutes
+        global_cache.set(cache_key, low, ttl_seconds=300)
         return low
 
+    def count_medium_stock(self, min_threshold=11, max_threshold=50):
+        """Counts items with stock between the specified thresholds."""
+        # Try to get from cache first
+        cache_key = f"inventory:medium_stock:{min_threshold}_{max_threshold}"
+        cached_value = global_cache.get(cache_key)
+        if cached_value is not None:
+            return cached_value
+            
+        # If not in cache, calculate from database
+        medium = 0
+        for row in range(self.model.rowCount()):
+            stock = self.model.data(self.model.index(row, 4))
+            if stock:
+                try:
+                    stock_value = int(stock)
+                    if min_threshold <= stock_value <= max_threshold:
+                        medium += 1
+                except ValueError:
+                    print(f"⚠️ Invalid stock at row {row}: {stock}")
+        
+        # Store in cache for 5 minutes
+        global_cache.set(cache_key, medium, ttl_seconds=300)
+        return medium
+
+    def count_high_stock(self, threshold=50):
+        """Counts items with stock above the specified threshold."""
+        # Try to get from cache first
+        cache_key = f"inventory:high_stock:{threshold}"
+        cached_value = global_cache.get(cache_key)
+        if cached_value is not None:
+            return cached_value
+            
+        # If not in cache, calculate from database
+        high = 0
+        for row in range(self.model.rowCount()):
+            stock = self.model.data(self.model.index(row, 4))
+            if stock:
+                try:
+                    if int(stock) > threshold:
+                        high += 1
+                except ValueError:
+                    print(f"⚠️ Invalid stock at row {row}: {stock}")
+        
+        # Store in cache for 5 minutes
+        global_cache.set(cache_key, high, ttl_seconds=300)
+        return high
+
     def get_low_stock_items(self, threshold=10):
-        """Returns a list of items with stock below the threshold."""
+        """Returns a list of items with stock below the specified threshold."""
+        # Try to get from cache first
+        cache_key = f"inventory:low_stock_items:{threshold}"
+        cached_value = global_cache.get(cache_key)
+        if cached_value is not None:
+            return cached_value
+            
+        # If not in cache, calculate from database
         low_stock_items = []
         for row in range(self.model.rowCount()):
-            try:
-                stock = int(self.model.data(self.model.index(row, 4)) or 0)
-                if stock < threshold:
-                    item_name = self.model.data(self.model.index(row, 1))
-                    low_stock_items.append({
-                        'name': item_name,
-                        'stock': stock
-                    })
-            except ValueError:
-                continue
+            item_id = self.model.data(self.model.index(row, 0))
+            name = self.model.data(self.model.index(row, 1))
+            stock = self.model.data(self.model.index(row, 4))
+            category = self.model.data(self.model.index(row, 3))
+            
+            if stock:
+                try:
+                    stock_value = int(stock)
+                    if stock_value < threshold:
+                        low_stock_items.append({
+                            'id': item_id,
+                            'name': name,
+                            'stock': stock_value,
+                            'category': category
+                        })
+                except ValueError:
+                    print(f"⚠️ Invalid stock at row {row}: {stock}")
+        
+        # Store in cache for 5 minutes
+        global_cache.set(cache_key, low_stock_items, ttl_seconds=300)
         return low_stock_items
 
     def count_recent_items(self, days=7):
@@ -221,6 +374,13 @@ class InventoryController:
 
     def calculate_inventory_value(self):
         """Calculates the total value of inventory."""
+        # Try to get from cache first
+        cache_key = "inventory:total_value"
+        cached_value = global_cache.get(cache_key)
+        if cached_value is not None:
+            return cached_value
+            
+        # If not in cache, calculate from database
         total_value = 0
         for row in range(self.model.rowCount()):
             stock = self.model.data(self.model.index(row, 4))
@@ -228,8 +388,11 @@ class InventoryController:
             if stock and buying_price:
                 try:
                     total_value += int(stock) * float(buying_price)
-                except ValueError:
+                except (ValueError, TypeError):
                     continue
+        
+        # Store in cache for 5 minutes
+        global_cache.set(cache_key, total_value, ttl_seconds=300)
         return total_value
 
     def get_product_details(self, row):
@@ -302,8 +465,83 @@ class InventoryController:
         self.model.setFilter(f"name LIKE '%{query}%'")
         self.model.select()
 
+    def get_all_categories(self):
+        """Get all unique categories from the inventory."""
+        # Try to get from cache first
+        cache_key = "inventory:categories"
+        cached_value = global_cache.get(cache_key)
+        if cached_value is not None:
+            return cached_value
+            
+        # If not in cache, get from database
+        categories = set()
+        for row in range(self.model.rowCount()):
+            category = self.model.data(self.model.index(row, 3))
+            if category:
+                categories.add(category)
+        
+        result = sorted(list(categories)) or ["Electronics", "Food", "Clothing", "Other"]
+        
+        # Store in cache for 10 minutes (categories change less frequently)
+        global_cache.set(cache_key, result, ttl_seconds=600)
+        return result
+    
+    def delete_category(self, category_name):
+        """
+        Delete a category by updating all products in that category to 'Other'.
+        
+        Args:
+            category_name (str): The name of the category to delete
+            
+        Returns:
+            tuple: (success, count) where count is the number of products updated
+        """
+        try:
+            count = 0
+            # Create a raw SQL query for direct execution
+            query = QSqlQuery(self.db)
+            
+            # First count products in this category for reporting
+            count_query = f"SELECT COUNT(*) FROM inventory WHERE category = '{category_name}'"
+            if query.exec_(count_query) and query.next():
+                count = query.value(0)
+            
+            # Now update all products with this category to 'Other'
+            update_query = f"UPDATE inventory SET category = 'Other' WHERE category = '{category_name}'"
+            
+            if query.exec_(update_query):
+                print(f"✅ Category '{category_name}' deleted, {count} products updated to 'Other'.")
+                # Refresh the model to reflect changes
+                self.model.select()
+                # Notify the event system about the change
+                global_event_system.notify_inventory_update()
+                return True, count
+            else:
+                print(f"❌ Error deleting category: {query.lastError().text()}")
+                return False, 0
+        except Exception as e:
+            print(f"❌ Error in delete_category: {e}")
+            return False, 0
+
     def close_database(self):
         """Closes the database connection."""
         if self.db.isOpen():
             self.db.close()
             print("✅ Database connection closed.")
+
+    def _invalidate_caches(self):
+        """Invalidate all inventory-related caches when data changes"""
+        global_cache.delete("inventory:total_stock")
+        global_cache.delete("inventory:total_value")
+        global_cache.delete("inventory:categories")
+        
+        # Delete low stock caches with different thresholds
+        for i in range(1, 21):  # Common threshold values
+            global_cache.delete(f"inventory:low_stock:{i}")
+            global_cache.delete(f"inventory:low_stock_items:{i}")
+            global_cache.delete(f"inventory:high_stock:{i*5}")  # Common high stock thresholds
+            
+        # Delete medium stock caches with common threshold ranges
+        common_ranges = [(1, 10), (5, 20), (10, 50), (11, 50), (10, 100)]
+        for min_val, max_val in common_ranges:
+            global_cache.delete(f"inventory:medium_stock:{min_val}_{max_val}")

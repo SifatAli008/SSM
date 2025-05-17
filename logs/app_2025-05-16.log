@@ -73,3 +73,8 @@
 2025-05-16 18:37:49,549 - SmartShopManager - INFO - Inventory controller initialized with database connection
 2025-05-16 18:38:39,886 - SmartShopManager - INFO - Logger initialized
 2025-05-16 18:38:42,644 - SmartShopManager - INFO - Inventory controller initialized with database connection
+2025-05-16 18:52:43,500 - SmartShopManager - INFO - Logger initialized
+2025-05-16 18:52:54,278 - SmartShopManager - INFO - Inventory controller initialized with database connection
+2025-05-16 19:04:41,626 - SmartShopManager - INFO - Generated sales report for Today
+2025-05-16 19:49:16,976 - SmartShopManager - INFO - Logger initialized
+2025-05-16 19:50:01,427 - SmartShopManager - INFO - Inventory controller initialized with database connection
