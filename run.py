@@ -85,7 +85,21 @@ def main():
         print("❌ Failed to connect to database. Will try to continue anyway...")
     
     # Step 3: Launch the PyQt application
-    launch_app()
+    app = QApplication(sys.argv)
+    
+    # Create and show the login window
+    login_window = LoginWindow()
+    login_window.show()
+    
+    # Set up cleanup on exit
+    def cleanup():
+        from app.utils.database import DatabaseManager
+        DatabaseManager.close_connections()
+    
+    app.aboutToQuit.connect(cleanup)
+    
+    # Start the application event loop
+    sys.exit(app.exec_())
 
 if __name__ == "__main__":
     try:

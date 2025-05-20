@@ -381,53 +381,27 @@ class DashboardPage(QWidget):
         graphs_layout.setSpacing(32)
         
         # Create enhanced graph widgets with appropriate chart types
-        self.sales_graph = EnhancedGraph(
-            "Sales Trend",
-            "Weekly Sales Data",
-            chart_type='line',
-            color="#2ecc71",
-            icon="📈"
-        )
-        
-        # Initialize with real data
+        self.sales_graph = EnhancedGraph()
+        self.sales_graph.set_title("Sales Trend", "Weekly Sales Data")
         sales_data = self.get_weekly_sales_data()
-        self.sales_graph.update_data(sales_data)
-        
-        # Set weekly change indicator
+        self.sales_graph.set_data(sales_data.get('data', []), sales_data.get('labels', []), chart_type='line', color="#2ecc71")
         weekly_change = self.get_revenue_weekly_change()
         change_color = "#27ae60" if weekly_change >= 0 else "#e74c3c"
         self.sales_graph.update_indicator(f"{weekly_change:+.1f}%", change_color)
         self.sales_graph.set_on_click(self.navigate_to_reports)
         
-        self.stock_graph = EnhancedGraph(
-            "Stock Flow",
-            f"Low Stock: {self.get_low_stock_count()} items",
-            chart_type='flow',
-            color="#f39c12",
-            icon="📊"
-        )
-        
-        # Initialize with real data
+        self.stock_graph = EnhancedGraph()
+        self.stock_graph.set_title("Stock Flow", f"Low Stock: {self.get_low_stock_count()} items")
         stock_data = self.get_stock_flow_data()
-        self.stock_graph.update_data(stock_data)
-        
-        # Set indicator for low stock count
+        self.stock_graph.set_data(stock_data, chart_type='bar', color="#f39c12")
         low_stock_count = self.get_low_stock_count()
         self.stock_graph.update_indicator(f"{low_stock_count} Low", "#f39c12")
-        self.stock_graph.set_on_click(lambda: self.navigate_to_page(1))  # Navigate to inventory
+        self.stock_graph.set_on_click(lambda: self.navigate_to_page(1))
         
-        self.profit_graph = EnhancedGraph(
-            "Quarterly Profit",
-            f"Inventory Value: ${self.get_inventory_value():,.2f}",
-            chart_type='bar',
-            color="#9b59b6",
-            icon="💹"
-        )
-        
-        # Initialize with real data
+        self.profit_graph = EnhancedGraph()
+        self.profit_graph.set_title("Quarterly Profit", f"Inventory Value: ${self.get_inventory_value():,.2f}")
         profit_data = self.get_quarterly_profit_data()
-        self.profit_graph.update_data(profit_data)
-        
+        self.profit_graph.set_data(profit_data.get('data', []), profit_data.get('labels', []), chart_type='bar', color="#9b59b6")
         inventory_value = self.get_inventory_value()
         self.profit_graph.update_indicator(f"${inventory_value:,.2f}", "#9b59b6")
         self.profit_graph.set_on_click(self.navigate_to_reports)
@@ -1234,67 +1208,45 @@ class DashboardPage(QWidget):
         try:
             if not hasattr(self, 'db_connection') or self.db_connection is None:
                 self.db_connection = DatabaseManager.get_sqlite_connection()
-                
             if self.db_connection:
                 cursor = self.db_connection.cursor()
-                
-                # Get current year
                 current_year = datetime.now().year
-                
-                # Define quarters
                 quarters = [
                     (f"{current_year}-01-01", f"{current_year}-03-31", "Q1"),
                     (f"{current_year}-04-01", f"{current_year}-06-30", "Q2"),
                     (f"{current_year}-07-01", f"{current_year}-09-30", "Q3"),
                     (f"{current_year}-10-01", f"{current_year}-12-31", "Q4")
                 ]
-                
-                # Get profit data for each quarter
-                labels = []
+                labels = [q[2] for q in quarters]
                 profit_data = []
-                
                 for start_date, end_date, label in quarters:
-                    # Only include quarters that have ended or the current quarter
-                    if datetime.strptime(end_date, "%Y-%m-%d") >= datetime.now():
-                        labels.append(label)
-                        
-                        # For current quarter, we can use actual data up to today
-                        try:
-                            # Calculate revenue
-                            cursor.execute("""
-                                SELECT SUM(total_price) 
-                                FROM sales 
-                                WHERE date(sale_date) BETWEEN date(?) AND date(?)
-                            """, (start_date, end_date))
-                            
-                            revenue = cursor.fetchone()[0]
-                            revenue = float(revenue) if revenue is not None else 0
-                            
-                            # Calculate expenses (if we had that data)
-                            # For now, let's assume expenses are 60-70% of revenue
-                            import random
-                            expense_ratio = random.uniform(0.6, 0.7)
-                            expenses = revenue * expense_ratio
-                            
-                            # Profit = Revenue - Expenses
-                            profit = revenue - expenses
-                            profit_data.append(round(profit, 2))
-                            
-                        except sqlite3.Error as e:
-                            print(f"Error querying profit data for {label}: {e}")
-                            profit_data.append(0)
-                
+                    try:
+                        cursor.execute("""
+                            SELECT SUM(total_price) 
+                            FROM sales 
+                            WHERE date(sale_date) BETWEEN date(?) AND date(?)
+                        """, (start_date, end_date))
+                        revenue = cursor.fetchone()[0]
+                        revenue = float(revenue) if revenue is not None else 0.0
+                        # Estimate expenses as 65% of revenue
+                        expenses = revenue * 0.65
+                        profit = revenue - expenses
+                        profit_data.append(round(profit, 2))
+                    except Exception as e:
+                        print(f"Error querying profit data for {label}: {e}")
+                        profit_data.append(0.0)
+                # Ensure always 4 quarters
+                while len(profit_data) < 4:
+                    profit_data.append(0.0)
                 return {
                     "labels": labels,
                     "data": profit_data
                 }
-                
         except Exception as e:
             print(f"Error getting quarterly profit data: {e}")
-            
         # Fallback data
         return {
-            "labels": ["Q1", "Q2"],
-            "data": [15000, 21000]
+            "labels": ["Q1", "Q2", "Q3", "Q4"],
+            "data": [0.0, 0.0, 0.0, 0.0]
         }
 

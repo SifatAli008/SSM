@@ -5,6 +5,13 @@ from PyQt5.QtSql import QSqlDatabase, QSqlQuery
 
 class DatabaseManager:
     """A utility class to manage database connections and operations"""
+    _instance = None
+    _qt_connection = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(DatabaseManager, cls).__new__(cls)
+        return cls._instance
     
     @staticmethod
     def get_db_path():
@@ -31,15 +38,31 @@ class DatabaseManager:
     @staticmethod
     def get_qt_connection():
         """Get a QSqlDatabase connection for Qt models and views"""
-        db = QSqlDatabase.addDatabase("QSQLITE")
-        db_path = DatabaseManager.get_db_path()
-        db.setDatabaseName(db_path)
-        
-        if not db.open():
-            print(f"❌ Failed to open Qt SQLite database at: {db_path}")
-            return None
+        if DatabaseManager._qt_connection is None:
+            # Remove any existing default connection
+            if QSqlDatabase.contains("qt_sql_default_connection"):
+                QSqlDatabase.removeDatabase("qt_sql_default_connection")
             
-        return db
+            db = QSqlDatabase.addDatabase("QSQLITE", "qt_sql_default_connection")
+            db_path = DatabaseManager.get_db_path()
+            db.setDatabaseName(db_path)
+            
+            if not db.open():
+                print(f"❌ Failed to open Qt SQLite database at: {db_path}")
+                return None
+                
+            DatabaseManager._qt_connection = db
+            
+        return DatabaseManager._qt_connection
+    
+    @staticmethod
+    def close_connections():
+        """Close all database connections"""
+        if DatabaseManager._qt_connection:
+            DatabaseManager._qt_connection.close()
+            DatabaseManager._qt_connection = None
+            if QSqlDatabase.contains("qt_sql_default_connection"):
+                QSqlDatabase.removeDatabase("qt_sql_default_connection")
     
     @staticmethod
     def execute_query(query, params=None):

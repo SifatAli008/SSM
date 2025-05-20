@@ -1,0 +1,14 @@
+{
+    "database": {
+        "type": "sqlite",
+        "path": "data/shop_manager.db"
+    },
+    "security": {
+        "min_password_length": 8,
+        "require_special_chars": true
+    },
+    "logging": {
+        "level": "INFO",
+        "file": "logs/app.log"
+    }
+}
