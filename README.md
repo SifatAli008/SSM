@@ -7,8 +7,9 @@ A comprehensive desktop application for retail store management built with Pytho
 ### Sales Dashboard
 - Real-time sales metrics and analytics
 - Daily, weekly, and monthly sales overview
-- Visual charts and performance indicators
-- Quick access to common actions
+- **Modern, visually enhanced charts** (line, bar, flow)
+- **Click any dashboard graph to open a full interactive Plotly chart in your browser**
+- Performance indicators and quick access to common actions
 
 ### Inventory Management
 - Complete product tracking and management
@@ -29,6 +30,7 @@ A comprehensive desktop application for retail store management built with Pytho
 - Sales trend analysis
 - Profit margin calculation
 - Printable report generation
+- **Quarterly profit chart is robust and always displays all quarters**
 
 ### User Management
 - Secure login system
@@ -49,10 +51,12 @@ A comprehensive desktop application for retail store management built with Pytho
 - Responsive layouts that adapt to different screen sizes
 - Improved text readability with appropriate font sizes and contrast
 - Intuitive navigation and user workflow
+- **Enhanced graph visuals and interactivity**
 
 ## Technical Information
 
-- Built with Python and PyQt5
+- Built with Python 3.9+ and PyQt5
+- Uses Plotly for interactive charting (opens in browser)
 - MVC architecture for clean separation of concerns
 - SQLite database for data storage
 - PDF generation for reports and receipts
@@ -65,6 +69,7 @@ A comprehensive desktop application for retail store management built with Pytho
 ### Prerequisites
 - Python 3.9 or higher
 - PyQt5
+- Plotly
 - Other dependencies in requirements.txt
 
 ### Installation
@@ -100,3 +105,7 @@ For more detailed documentation about specific components:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+For more, see the [GitHub repository](https://github.com/SifatAli008/SSM)
