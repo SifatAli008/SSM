@@ -15,12 +15,14 @@ class ChartWidget(QWidget):
     """Custom widget for painting charts"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumHeight(200)
+        self.setMinimumHeight(220)
+        self.setMaximumHeight(220)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.data = []
         self.labels = []
         self.chart_type = 'line'
         self.color = '#3498db'
+        self.setStyleSheet("background: #ff00ff; border: 2px solid #000;")
 
     def set_data(self, data, labels=None, chart_type='line', color='#3498db'):
         # Convert dictionary data to list of values if needed
@@ -43,6 +45,7 @@ class ChartWidget(QWidget):
         self.update()
         
     def paintEvent(self, event):
+        print('ChartWidget paintEvent called')
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         width = self.width()
