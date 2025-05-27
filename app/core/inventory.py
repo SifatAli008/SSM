@@ -1,3 +1,5 @@
+# ARCHIVED: Not used in current PyQt/SQLite inventory system.
+'''
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from app.utils.logger import logger
@@ -242,4 +244,5 @@ class InventoryManager:
     def get_category_by_name(self, name: str) -> Optional[Category]:
         """Get category by name."""
         with DatabaseManager().get_session() as session:
-            return session.query(Category).filter(Category.name == name).first() 
+            return session.query(Category).filter(Category.name == name).first()
+''' 

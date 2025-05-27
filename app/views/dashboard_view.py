@@ -19,7 +19,7 @@ from app.views.widgets.enhanced_graph import EnhancedGraph
 from app.views.widgets.enhanced_activity import EnhancedActivity
 
 # Deprecated - keep for backward compatibility
-from app.views.widgets.graph_widget import Graph
+# from app.views.widgets.graph_widget import Graph
 from app.views.inventory_view import InventoryView
 
 # Controllers for database access
@@ -70,13 +70,10 @@ class DashboardPage(QWidget):
         action = data.get('action', 'unknown')
         product = data.get('product', {})
         
-        print(f"🔄 Dashboard: Inventory data changed ({action}), updating...")
-        
         if action == 'add':
             product_name = product.get('name', 'Unknown product')
             product_category = product.get('category', 'Unknown category')
             product_quantity = product.get('quantity', 0)
-            print(f"📦 New product added: {product_name} ({product_category}), quantity: {product_quantity}")
             
             # Adding a product might affect low stock count
             low_stock_count = self.get_low_stock_count()
@@ -88,7 +85,6 @@ class DashboardPage(QWidget):
             
         elif action == 'delete':
             product_name = product.get('name', 'Unknown product')
-            print(f"🗑️ Product deleted: {product_name}")
             
             # Deleting a product affects inventory value
             inventory_value = self.get_inventory_value()
@@ -101,7 +97,6 @@ class DashboardPage(QWidget):
         elif action == 'update':
             product_name = product.get('name', 'Unknown product')
             quantity = product.get('quantity', 'unknown quantity')
-            print(f"✏️ Product updated: {product_name} (Qty: {quantity})")
             
             # Update stock count and value if quantity changed
             low_stock_count = self.get_low_stock_count()
@@ -114,7 +109,6 @@ class DashboardPage(QWidget):
         elif action == 'sale_impact':
             # Inventory changed due to a sale
             sale_id = data.get('sale_id', None)
-            print(f"🛒 Sale {sale_id} affected inventory")
             
             # Update stock levels
             low_stock_count = self.get_low_stock_count()
@@ -135,24 +129,16 @@ class DashboardPage(QWidget):
         action = data.get('action', 'unknown')
         sale = data.get('sale', {})
         
-        print(f"🔄 Dashboard: Sales data changed ({action}), updating...")
-        
         if action == 'add':
             customer = sale.get('customer', 'Unknown customer')
             amount = sale.get('total', 0)
-            print(f"💰 New sale recorded: ${amount} to {customer}")
-            
-            # Update sales graph with real-time data
-            self.sales_graph.update_data("Sale added")
             
         elif action == 'update':
             sale_id = sale.get('id', 'Unknown ID')
             amount = sale.get('total', 0)
-            print(f"✏️ Sale {sale_id} updated: ${amount}")
         
         elif action == 'delete':
             sale_id = sale.get('id', 'Unknown ID')
-            print(f"🗑️ Sale {sale_id} deleted")
         
         # Update revenue metrics with real-time data
         total_revenue = self.get_total_revenue()
@@ -177,20 +163,15 @@ class DashboardPage(QWidget):
         action = data.get('action', 'unknown')
         customer = data.get('customer', {})
         
-        print(f"🔄 Dashboard: Customer data changed ({action}), updating...")
-        
         if action == 'add':
             customer_name = customer.get('name', 'Unknown customer')
-            print(f"👤 New customer added: {customer_name}")
             
         elif action == 'update':
             customer_id = customer.get('id', 'Unknown ID')
             customer_name = customer.get('name', 'Unknown customer')
-            print(f"✏️ Customer {customer_id} updated: {customer_name}")
-            
+        
         elif action == 'delete':
             customer_id = customer.get('id', 'Unknown ID')
-            print(f"🗑️ Customer {customer_id} deleted")
         
         # Update customer metrics with real-time data
         customer_count = self.get_customer_count()
@@ -207,8 +188,6 @@ class DashboardPage(QWidget):
 
     def refresh_dashboard_data(self):
         """Refresh all dashboard data to ensure real-time updates"""
-        print("🔄 Refreshing dashboard data...")
-        
         try:
             # Update revenue metrics
             total_revenue = self.get_total_revenue()
@@ -254,10 +233,8 @@ class DashboardPage(QWidget):
             # Update recent activities
             self.update_recent_activities()
             
-            print("✅ Dashboard data refreshed successfully")
-            
         except Exception as e:
-            print(f"❌ Error refreshing dashboard data: {e}")
+            pass
         
         return True
     
@@ -588,11 +565,11 @@ class DashboardPage(QWidget):
                         if result and result[0]:
                             return float(result[0])
                     else:
-                        print("Warning: 'total_price' column not found in sales table")
+                        pass
                 else:
-                    print("Warning: 'sales' table does not exist")
-        except (sqlite3.Error, Exception) as e:
-            print(f"Error getting revenue: {e}")
+                    pass
+        except Exception as e:
+            pass
         return 0.0
 
     def get_revenue_weekly_change(self):
@@ -645,7 +622,7 @@ class DashboardPage(QWidget):
                 return change_percent
                 
         except Exception as e:
-            print(f"Error calculating revenue change: {e}")
+            pass
             
         # Fallback if there's an error
         return 3.2  # Default 3.2% increase
@@ -668,9 +645,9 @@ class DashboardPage(QWidget):
                     if result:
                         return result[0]
                 else:
-                    print("Warning: 'customers' table does not exist")
-        except (sqlite3.Error, Exception) as e:
-            print(f"Error getting customer count: {e}")
+                    pass
+        except Exception as e:
+            pass
         return 120  # Default customer count
 
     def get_pending_orders(self):
@@ -705,9 +682,9 @@ class DashboardPage(QWidget):
                         if result:
                             return result[0]
                 else:
-                    print("Warning: 'sales' table does not exist")
-        except (sqlite3.Error, Exception) as e:
-            print(f"Error getting pending orders: {e}")
+                    pass
+        except Exception as e:
+            pass
         return 5  # Default pending orders
 
     def get_todays_deliveries(self):
@@ -736,9 +713,9 @@ class DashboardPage(QWidget):
                         if result:
                             return result[0]
                 else:
-                    print("Warning: 'sales' table does not exist")
-        except (sqlite3.Error, Exception) as e:
-            print(f"Error getting today's deliveries: {e}")
+                    pass
+        except Exception as e:
+            pass
         return 3  # Default deliveries today
 
     def get_main_window(self):
@@ -758,7 +735,7 @@ class DashboardPage(QWidget):
         if main_window and hasattr(main_window, 'change_page'):
             main_window.change_page(page_index)
         else:
-            print("Cannot navigate: Main window not found or no change_page method.")
+            pass
 
     def navigate_to_reports(self):
         """Navigate directly to reports page"""
@@ -783,7 +760,7 @@ class DashboardPage(QWidget):
             if inventory_view:
                 QTimer.singleShot(100, inventory_view.show_add_product_dialog)
             else:
-                QMessageBox.warning(self, "Error", "Could not find inventory page")
+                pass
 
     def generate_report(self):
         """Navigate to reports page and show report generation dialog"""
@@ -812,7 +789,7 @@ class DashboardPage(QWidget):
         main_window = self.get_main_window()
         
         if not main_window:
-            QMessageBox.warning(self, "Error", "Could not access reports page")
+            pass
             return
             
         # Find the reports view in the content stack
@@ -824,7 +801,7 @@ class DashboardPage(QWidget):
                 break
         
         if not reports_view:
-            QMessageBox.warning(self, "Error", "Reports page not found")
+            pass
             return
             
         # Call the appropriate method based on button clicked
@@ -848,12 +825,10 @@ class DashboardPage(QWidget):
             self.activity_widget.update_activities(activities)
             
         except Exception as e:
-            print(f"Error updating recent activities: {e}")
+            pass
 
     def handle_activity_click(self, activity_type, item_id):
         """Handle clicks on activity items by navigating to the related screen"""
-        print(f"Clicked on activity: {activity_type}, ID: {item_id}")
-        
         if activity_type == "sale":
             # Navigate to sales page
             self.navigate_to_page(2)
@@ -1008,7 +983,7 @@ class DashboardPage(QWidget):
                 activities.sort(key=lambda x: self.time_value(x["time"]), reverse=True)
                 
         except Exception as e:
-            print(f"Error getting recent activities: {e}")
+            pass
             
         # If no activities were found, provide fallback data
         if not activities:
@@ -1122,4 +1097,4 @@ class DashboardPage(QWidget):
         self.last_updated_label.setText(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     def on_error_occurred(self, error_message):
-        QMessageBox.critical(self, "Dashboard Error", f"An error occurred: {error_message}")
+        pass

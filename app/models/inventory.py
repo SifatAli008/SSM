@@ -1,3 +1,5 @@
+# ARCHIVED: Not used in current PyQt/SQLite inventory system.
+'''
 from datetime import datetime
 from config.database import FirebaseDB
 from config.settings import COLLECTION_INVENTORY
@@ -134,3 +136,4 @@ class InventoryItem:
         items_ref = db.get_collection(COLLECTION_INVENTORY)
         db.delete_document(items_ref, self.item_id)
         return True
+'''

@@ -10,27 +10,46 @@ from app.utils.cache_manager import global_cache
 
 class InventoryController:
     def __init__(self):
-        # Setup database connection using DatabaseManager
-        self.db = DatabaseManager.get_qt_connection()
+        self.db = None
+        self.model = None
+        self.initialize_database()
         
-        if not self.db or not self.db.isOpen():
-            logger.error("Failed to open database connection in InventoryController")
-            return
+    def initialize_database(self):
+        """Initialize database connection and model"""
+        try:
+            # Setup database connection using DatabaseManager
+            self.db = DatabaseManager.get_qt_connection()
             
-        # Create tables if they don't exist
-        self._create_tables()
-        logger.info("Inventory controller initialized with database connection")
-
-        # Initialize the model for the inventory table
-        self.model = QSqlTableModel(db=self.db)
-        self.model.setTable("inventory")
-        self.model.setEditStrategy(QSqlTableModel.OnFieldChange)
-        self.model.select()
-
-        # Set column headers
-        headers = ["ID", "Item Name", "Details", "Category", "Stock", "Buying Price", "Selling Price", "Last Updated"]
-        for i, header in enumerate(headers):
-            self.model.setHeaderData(i, Qt.Horizontal, header)
+            if not self.db or not self.db.isOpen():
+                raise Exception("Failed to open database connection")
+                
+            # Initialize the model for the inventory table
+            self.model = QSqlTableModel(db=self.db)
+            self.model.setTable("inventory")
+            self.model.setEditStrategy(QSqlTableModel.OnFieldChange)
+            
+            # Set column headers
+            headers = [
+                "ID", "Item Name", "Details", "Category", "Stock", 
+                "Buying Price", "Selling Price", "Reorder Level", 
+                "SKU", "Supplier ID", "Expiry Date", "Created At", "Last Updated"
+            ]
+            for i, header in enumerate(headers):
+                self.model.setHeaderData(i, Qt.Horizontal, header)
+                
+            # Initial data load
+            if not self.model.select():
+                raise Exception(f"Failed to load inventory data: {self.model.lastError().text()}")
+                
+            logger.info("Inventory controller initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Error initializing inventory controller: {e}")
+            if self.db and self.db.isOpen():
+                self.db.close()
+            self.db = None
+            self.model = None
+            raise
 
     def _create_tables(self):
         """Create necessary tables if they don't exist."""
@@ -46,12 +65,17 @@ class InventoryController:
             stock INTEGER DEFAULT 0,
             buying_price REAL DEFAULT 0.0,
             selling_price REAL DEFAULT 0.0,
+            reorder_level INTEGER DEFAULT 10,
+            sku TEXT,
+            supplier_id INTEGER,
+            expiry_date TEXT,
+            created_at TEXT,
             last_updated TEXT
         )
         """
         
         if not query.exec_(create_inventory_table):
-            print(f"❌ Error creating inventory table: {query.lastError().text()}")
+            print(f"Error creating inventory table: {query.lastError().text()}")
             
         # Create sales table for future use
         create_sales_table = """
@@ -66,11 +90,27 @@ class InventoryController:
         """
         
         if not query.exec_(create_sales_table):
-            print(f"❌ Error creating sales table: {query.lastError().text()}")
+            print(f"Error creating sales table: {query.lastError().text()}")
 
-    def add_product(self, name, quantity, buying_price, selling_price=None, details="", category="Other"):
+    def add_product(self, name, quantity, buying_price, selling_price=None, details="", category="Other", 
+                   reorder_level=10, sku=None, supplier_id=None, expiry_date=None):
         """Adds a new product to the inventory."""
         try:
+            if not self.model:
+                self.initialize_database()
+                
+            # Validate inputs
+            if not name or not name.strip():
+                raise ValueError("Product name cannot be empty")
+            if quantity < 0:
+                raise ValueError("Quantity cannot be negative")
+            if buying_price < 0:
+                raise ValueError("Buying price cannot be negative")
+            if selling_price is not None and selling_price < 0:
+                raise ValueError("Selling price cannot be negative")
+            if reorder_level < 0:
+                raise ValueError("Reorder level cannot be negative")
+
             # If selling price is not provided, set it to buying price + 20%
             if selling_price is None:
                 selling_price = buying_price * 1.2
@@ -79,41 +119,56 @@ class InventoryController:
             
             # Insert a new row
             row = self.model.rowCount()
-            self.model.insertRow(row)
+            if not self.model.insertRow(row):
+                raise Exception(f"Failed to insert new row: {self.model.lastError().text()}")
             
             # Set data for each column
-            self.model.setData(self.model.index(row, 1), name)
-            self.model.setData(self.model.index(row, 2), details)
-            self.model.setData(self.model.index(row, 3), category)
-            self.model.setData(self.model.index(row, 4), int(quantity))
-            self.model.setData(self.model.index(row, 5), float(buying_price))
-            self.model.setData(self.model.index(row, 6), float(selling_price))
-            self.model.setData(self.model.index(row, 7), current_datetime)
+            data = {
+                1: name,
+                2: details,
+                3: category,
+                4: int(quantity),
+                5: float(buying_price),
+                6: float(selling_price),
+                7: int(reorder_level),
+                8: sku,
+                9: supplier_id,
+                10: expiry_date,
+                11: current_datetime,  # created_at
+                12: current_datetime   # last_updated
+            }
+            
+            for column, value in data.items():
+                if not self.model.setData(self.model.index(row, column), value):
+                    raise Exception(f"Failed to set data for column {column}: {self.model.lastError().text()}")
 
-            if self.model.submitAll():
-                print(f"✅ Product '{name}' added successfully.")
+            if not self.model.submitAll():
+                raise Exception(f"Failed to submit new product: {self.model.lastError().text()}")
                 
-                # Clear relevant caches when inventory changes
-                self._invalidate_caches()
-                
-                # Notify the event system about the change with product data
-                event_data = {
-                    "action": "add",
-                    "product": {
-                        "name": name,
-                        "quantity": quantity,
-                        "buying_price": buying_price,
-                        "selling_price": selling_price,
-                        "category": category
-                    }
+            logger.info(f"Product '{name}' added successfully")
+            
+            # Clear relevant caches
+            self._invalidate_caches()
+            
+            # Notify the event system
+            event_data = {
+                "action": "add",
+                "product": {
+                    "name": name,
+                    "quantity": quantity,
+                    "buying_price": buying_price,
+                    "selling_price": selling_price,
+                    "category": category,
+                    "sku": sku
                 }
-                global_event_system.notify_inventory_update(event_data)
-                return True
-            else:
-                print(f"❌ Failed to submit new product: {self.model.lastError().text()}")
-                return False
+            }
+            global_event_system.notify_inventory_update(event_data)
+            return True
+            
         except Exception as e:
-            print(f"❌ Error in add_product: {e}")
+            logger.error(f"Error in add_product: {e}")
+            if self.model:
+                self.model.revertAll()
             return False
 
     def delete_item(self, row):
@@ -127,7 +182,7 @@ class InventoryController:
             # Remove the row
             success = self.model.removeRow(row)
             if success and self.model.submitAll():
-                print(f"🗑️ Product '{item_name}' deleted successfully.")
+                print(f"Product '{item_name}' deleted successfully.")
                 
                 # Clear relevant caches when inventory changes
                 self._invalidate_caches()
@@ -144,10 +199,10 @@ class InventoryController:
                 global_event_system.notify_inventory_update(event_data)
                 return True
             else:
-                print(f"❌ Error deleting product: {self.model.lastError().text()}")
+                print(f"Error deleting product: {self.model.lastError().text()}")
                 return False
         except Exception as e:
-            print(f"❌ Error in delete_item: {e}")
+            print(f"Error in delete_item: {e}")
             return False
 
     def delete_multiple_items(self, rows):
@@ -170,6 +225,16 @@ class InventoryController:
             item_id = self.model.data(self.model.index(row, 0))
             item_name = self.model.data(self.model.index(row, 1))
             
+            # Validate inputs
+            if 'stock' in data and data['stock'] < 0:
+                raise ValueError("Stock cannot be negative")
+            if 'buying_price' in data and data['buying_price'] < 0:
+                raise ValueError("Buying price cannot be negative")
+            if 'selling_price' in data and data['selling_price'] < 0:
+                raise ValueError("Selling price cannot be negative")
+            if 'reorder_level' in data and data['reorder_level'] < 0:
+                raise ValueError("Reorder level cannot be negative")
+            
             # Update each field
             for column, value in data.items():
                 self.model.setData(self.model.index(row, column), value)
@@ -180,14 +245,20 @@ class InventoryController:
                     self.model.setData(self.model.index(row, 2), additional_data['details'])
                 if 'category' in additional_data:
                     self.model.setData(self.model.index(row, 3), additional_data['category'])
+                if 'sku' in additional_data:
+                    self.model.setData(self.model.index(row, 8), additional_data['sku'])
+                if 'supplier_id' in additional_data:
+                    self.model.setData(self.model.index(row, 9), additional_data['supplier_id'])
+                if 'expiry_date' in additional_data:
+                    self.model.setData(self.model.index(row, 10), additional_data['expiry_date'])
             
             # Add last updated timestamp
             current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.model.setData(self.model.index(row, 7), current_datetime)
+            self.model.setData(self.model.index(row, 12), current_datetime)
             
             # Submit changes
             if self.model.submitAll():
-                print(f"✅ Product '{item_name}' updated successfully.")
+                logger.info(f"Product '{item_name}' updated successfully.")
                 
                 # Clear relevant caches when inventory changes
                 self._invalidate_caches()
@@ -207,6 +278,14 @@ class InventoryController:
                         event_data["product"]["name"] = value
                     elif column == 4:
                         event_data["product"]["quantity"] = value
+                    elif column == 5:
+                        event_data["product"]["buying_price"] = value
+                    elif column == 6:
+                        event_data["product"]["selling_price"] = value
+                    elif column == 7:
+                        event_data["product"]["reorder_level"] = value
+                    elif column == 8:
+                        event_data["product"]["sku"] = value
                 
                 # Add additional data if available
                 if additional_data:
@@ -217,22 +296,29 @@ class InventoryController:
                 global_event_system.notify_inventory_update(event_data)
                 return True
             else:
-                print(f"❌ Error updating product: {self.model.lastError().text()}")
+                logger.error(f"Error updating product: {self.model.lastError().text()}")
                 return False
         except Exception as e:
-            print(f"❌ Error in update_item: {e}")
+            logger.error(f"Error in update_item: {e}")
             return False
 
     def refresh_data(self):
         """Refreshes the data from the database."""
         try:
-            self.model.select()
+            if not self.model:
+                self.initialize_database()
+                return True
+                
+            if not self.model.select():
+                raise Exception(f"Failed to refresh data: {self.model.lastError().text()}")
+                
             # Clear all inventory caches when refreshing data
             self._invalidate_caches()
-            print("🔄 Data refreshed.")
+            logger.info("Data refreshed successfully")
             return True
+            
         except Exception as e:
-            print(f"❌ Error refreshing data: {e}")
+            logger.error(f"Error refreshing data: {e}")
             return False
 
     def count_total_stock(self):
@@ -251,7 +337,7 @@ class InventoryController:
                 try:
                     total += int(stock)
                 except ValueError:
-                    print(f"⚠️ Skipping invalid stock value at row {row}: {stock}")
+                    print(f"Warning: Skipping invalid stock value at row {row}: {stock}")
         
         # Store in cache for 5 minutes
         global_cache.set(cache_key, total, ttl_seconds=300)
@@ -274,7 +360,7 @@ class InventoryController:
                     if int(stock) < threshold:
                         low += 1
                 except ValueError:
-                    print(f"⚠️ Invalid stock at row {row}: {stock}")
+                    print(f"Warning: Invalid stock at row {row}: {stock}")
         
         # Store in cache for 5 minutes
         global_cache.set(cache_key, low, ttl_seconds=300)
@@ -298,7 +384,7 @@ class InventoryController:
                     if min_threshold <= stock_value <= max_threshold:
                         medium += 1
                 except ValueError:
-                    print(f"⚠️ Invalid stock at row {row}: {stock}")
+                    print(f"Warning: Invalid stock at row {row}: {stock}")
         
         # Store in cache for 5 minutes
         global_cache.set(cache_key, medium, ttl_seconds=300)
@@ -321,7 +407,7 @@ class InventoryController:
                     if int(stock) > threshold:
                         high += 1
                 except ValueError:
-                    print(f"⚠️ Invalid stock at row {row}: {stock}")
+                    print(f"Warning: Invalid stock at row {row}: {stock}")
         
         # Store in cache for 5 minutes
         global_cache.set(cache_key, high, ttl_seconds=300)
@@ -354,7 +440,7 @@ class InventoryController:
                             'category': category
                         })
                 except ValueError:
-                    print(f"⚠️ Invalid stock at row {row}: {stock}")
+                    print(f"Warning: Invalid stock at row {row}: {stock}")
         
         # Store in cache for 5 minutes
         global_cache.set(cache_key, low_stock_items, ttl_seconds=300)
@@ -367,7 +453,7 @@ class InventoryController:
         cutoff_str = cutoff_date.strftime("%Y-%m-%d %H:%M:%S")
         
         for row in range(self.model.rowCount()):
-            last_updated = self.model.data(self.model.index(row, 7))
+            last_updated = self.model.data(self.model.index(row, 12))
             if last_updated and last_updated > cutoff_str:
                 count += 1
         return count
@@ -426,13 +512,13 @@ class InventoryController:
                             error_count += 1
                             
                     except (ValueError, KeyError) as e:
-                        print(f"⚠️ Error processing row: {row} - {str(e)}")
+                        print(f"Warning: Error processing row: {row} - {str(e)}")
                         error_count += 1
                         
-            print(f"✅ Bulk upload completed. Success: {success_count}, Errors: {error_count}")
+            print(f"Bulk upload completed. Success: {success_count}, Errors: {error_count}")
             return True, success_count, error_count
         except Exception as e:
-            print(f"❌ Error uploading bulk stock: {e}")
+            print(f"Error uploading bulk stock: {e}")
             return False, 0, 0
 
     def export_inventory_to_csv(self, filepath):
@@ -442,22 +528,22 @@ class InventoryController:
                 writer = csv.writer(csvfile)
                 
                 # Write headers
-                headers = ["Item Name", "Details", "Category", "Stock", "Buying Price", "Selling Price", "Last Updated"]
+                headers = ["Item Name", "Details", "Category", "Stock", "Buying Price", "Selling Price", "Reorder Level", "SKU", "Supplier ID", "Expiry Date", "Created At", "Last Updated"]
                 writer.writerow(headers)
                 
                 # Write data
                 count = 0
                 for row in range(self.model.rowCount()):
                     data = []
-                    for col in range(1, 8):  # Skip ID column
+                    for col in range(1, 13):  # Skip ID column
                         data.append(self.model.data(self.model.index(row, col)))
                     writer.writerow(data)
                     count += 1
                     
-            print(f"✅ Exported {count} items to CSV successfully.")
+            print(f"Exported {count} items to CSV successfully.")
             return True, count
         except Exception as e:
-            print(f"❌ Error exporting to CSV: {e}")
+            print(f"Error exporting to CSV: {e}")
             return False, 0
 
     def search_products(self, query):
@@ -510,24 +596,24 @@ class InventoryController:
             update_query = f"UPDATE inventory SET category = 'Other' WHERE category = '{category_name}'"
             
             if query.exec_(update_query):
-                print(f"✅ Category '{category_name}' deleted, {count} products updated to 'Other'.")
+                print(f"Category '{category_name}' deleted, {count} products updated to 'Other'.")
                 # Refresh the model to reflect changes
                 self.model.select()
                 # Notify the event system about the change
                 global_event_system.notify_inventory_update()
                 return True, count
             else:
-                print(f"❌ Error deleting category: {query.lastError().text()}")
+                print(f"Error deleting category: {query.lastError().text()}")
                 return False, 0
         except Exception as e:
-            print(f"❌ Error in delete_category: {e}")
+            print(f"Error in delete_category: {e}")
             return False, 0
 
     def close_database(self):
         """Closes the database connection."""
         if self.db.isOpen():
             self.db.close()
-            print("✅ Database connection closed.")
+            print("Database connection closed.")
 
     def _invalidate_caches(self):
         """Invalidate all inventory-related caches when data changes"""
@@ -545,3 +631,19 @@ class InventoryController:
         common_ranges = [(1, 10), (5, 20), (10, 50), (11, 50), (10, 100)]
         for min_val, max_val in common_ranges:
             global_cache.delete(f"inventory:medium_stock:{min_val}_{max_val}")
+
+    def insert_item(self, row, item_data):
+        try:
+            if not self.model:
+                self.initialize_database()
+            if not self.model.insertRow(row):
+                raise Exception(f"Failed to insert row: {self.model.lastError().text()}")
+            for col, value in enumerate(item_data):
+                self.model.setData(self.model.index(row, col), value)
+            if not self.model.submitAll():
+                raise Exception(f"Failed to submit inserted item: {self.model.lastError().text()}")
+            self._invalidate_caches()
+            return True
+        except Exception as e:
+            logger.error(f"Error in insert_item: {e}")
+            return False

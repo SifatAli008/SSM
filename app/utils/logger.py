@@ -2,6 +2,21 @@ import logging
 import os
 from pathlib import Path
 from datetime import datetime
+import sys
+
+class SafeStreamHandler(logging.StreamHandler):
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            try:
+                stream = self.stream
+                stream.write(msg + self.terminator)
+            except UnicodeEncodeError:
+                # Replace unencodable characters
+                stream.write(msg.encode(stream.encoding, errors='replace').decode(stream.encoding, errors='replace') + self.terminator)
+            self.flush()
+        except Exception:
+            self.handleError(record)
 
 class Logger:
     """
@@ -28,7 +43,7 @@ class Logger:
         self._logger.setLevel(logging.DEBUG)
 
         # Create handlers
-        console_handler = logging.StreamHandler()
+        console_handler = SafeStreamHandler(sys.stdout)
         console_handler.setLevel(logging.INFO)
         
         today = datetime.now().strftime("%Y-%m-%d")

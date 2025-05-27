@@ -289,7 +289,7 @@ class MainWindow(QMainWindow):
         footer_layout = QHBoxLayout(footer_container)
         footer_layout.setContentsMargins(20, 10, 20, 10)
        
-        copyright_label = QLabel("© 2025 Smart Shop Manager | Developed by Sifat Ali")
+        copyright_label = QLabel("© 2025 Smart Shop Manager | Developed by Smart Shop Manager Team")
         copyright_label.setFont(QFont(ThemeManager.FONTS["family"], ThemeManager.FONTS["size_small"]))
         footer_layout.addWidget(copyright_label)
        
@@ -383,9 +383,10 @@ class MainWindow(QMainWindow):
             self.show_alert("Inventory page not found", "error")
 
     def add_inventory_page(self):
-        # Create inventory page
-        inventory_view = InventoryView()
-        self.content_stack.addWidget(inventory_view)
+        # Create inventory controller and inventory page
+        self.inventory_controller = InventoryController()
+        self.inventory_page = InventoryView(controller=self.inventory_controller)
+        self.content_stack.addWidget(self.inventory_page)
 
     def add_sales_page(self):
         # Create sales page

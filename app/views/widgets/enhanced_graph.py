@@ -22,7 +22,7 @@ class ChartWidget(QWidget):
         self.labels = []
         self.chart_type = 'line'
         self.color = '#3498db'
-        self.setStyleSheet("background: #ff00ff; border: 2px solid #000;")
+        self.setStyleSheet("")
 
     def set_data(self, data, labels=None, chart_type='line', color='#3498db'):
         # Convert dictionary data to list of values if needed
@@ -184,13 +184,8 @@ class EnhancedGraph(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("enhancedGraph")
-        self.setStyleSheet("""
-            #enhancedGraph {
-                background-color: #ffffff;
-                border-radius: 12px;
-                border: 1px solid rgba(0, 0, 0, 0.1);
-            }
-        """)
+        self._hover = False
+        self.setStyleSheet(self.default_stylesheet())
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(16, 16, 16, 16)
         self.layout.setSpacing(12)
@@ -236,6 +231,37 @@ class EnhancedGraph(QFrame):
         self.layout.addWidget(self.chart)
         self.indicator_label.hide()
         self.click_callback = None
+
+    def enterEvent(self, event):
+        self._hover = True
+        self.setStyleSheet(self.hover_stylesheet())
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hover = False
+        self.setStyleSheet(self.default_stylesheet())
+        super().leaveEvent(event)
+
+    def default_stylesheet(self):
+        return """
+        #enhancedGraph {
+            background-color: #ffffff;
+            border-radius: 12px;
+            border: 1.5px solid rgba(0, 0, 0, 0.08);
+            transition: box-shadow 0.2s, border-color 0.2s;
+            box-shadow: 0 2px 8px rgba(44, 62, 80, 0.04);
+        }
+        """
+
+    def hover_stylesheet(self):
+        return """
+        #enhancedGraph {
+            background-color: #fafdff;
+            border-radius: 12px;
+            border: 2px solid #4fc3f7;
+            box-shadow: 0 4px 16px rgba(44, 62, 80, 0.10);
+        }
+        """
 
     def set_title(self, title, subtitle=None):
         self.title_label.setText(title)
