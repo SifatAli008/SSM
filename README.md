@@ -2,6 +2,13 @@
 
 A comprehensive desktop application for retail store management built with Python and PyQt5. The application provides a modern, responsive UI with intuitive controls for managing inventory, sales, customers, and generating reports.
 
+## Recent Improvements
+- Unified info card backgrounds and value text for a seamless, professional look
+- Inventory info cards now always show up-to-date values (never blank)
+- Modernized search bar in inventory view for better usability and appearance
+- Improved real-time updates for all dashboard and inventory metrics
+- Enhanced UI consistency and accessibility across all views
+
 ## Features
 
 ### Sales Dashboard
@@ -51,6 +58,9 @@ A comprehensive desktop application for retail store management built with Pytho
 - Responsive layouts that adapt to different screen sizes
 - Improved text readability with appropriate font sizes and contrast
 - Intuitive navigation and user workflow
+- **Unified info card backgrounds and value text for a seamless look**
+- **Inventory info cards always show up-to-date values**
+- **Modern, polished search bar in inventory view**
 - **Enhanced graph visuals and interactivity**
 
 ## Technical Information
@@ -78,12 +88,24 @@ A comprehensive desktop application for retail store management built with Pytho
 git clone https://github.com/SifatAli008/SSM.git
 ```
 
-2. Install dependencies
+2. Create and activate a virtual environment (recommended)
+```bash
+# Create venv (if not already present)
+python -m venv venv
+
+# Activate venv (Windows)
+venv\Scripts\activate
+
+# Activate venv (macOS/Linux)
+source venv/bin/activate
+```
+
+3. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the application
+4. Run the application
 ```bash
 python run.py
 ```
@@ -93,6 +115,10 @@ Run the automated test suite to ensure everything is working properly:
 ```bash
 python run_tests.py
 ```
+
+### Troubleshooting
+- If you see errors about missing packages, make sure your virtual environment is activated before running `pip install` or `python run.py`.
+- If you have issues with PyQt5 on Linux, you may need to install system dependencies (see PyQt5 docs).
 
 ## Documentation
 
