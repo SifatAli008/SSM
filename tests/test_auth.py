@@ -1,6 +1,7 @@
 import pytest
 from app.utils.auth import AuthManager
 from app.utils.error_handler import AuthenticationError
+from datetime import timedelta
 
 @pytest.mark.security
 class TestAuthManager:
@@ -70,6 +71,6 @@ class TestAuthManager:
         assert auth_manager.verify_token("invalid_token") is None
         
         # Test expired token
-        auth_manager.token_expiry = 0  # Set expiry to 0 to force expiration
+        auth_manager.token_expiry = timedelta(seconds=0)  # Set expiry to 0 to force expiration
         token = auth_manager.create_token({"id": 1, "username": "test", "role": "user"})
         assert auth_manager.verify_token(token) is None 

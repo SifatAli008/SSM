@@ -242,17 +242,25 @@ class DashboardPage(QWidget):
         """Update summary cards with real data"""
         # Update revenue card
         total_revenue = self.get_total_revenue()
+        if not total_revenue:
+            total_revenue = 0.0
         weekly_change = self.get_revenue_weekly_change()
         change_text = f"Last 7 Days: {weekly_change:.1f}%{'↑' if weekly_change >= 0 else '↓'}"
         self.revenue_card.update_values(f"${total_revenue:,.2f}", change_text)
         
         # Update customer card
         customer_count = self.get_customer_count()
+        if not customer_count:
+            customer_count = 0
         self.customer_card.update_values(f"{customer_count}", "Active Customers")
         
         # Update orders card
         pending_orders = self.get_pending_orders()
+        if not pending_orders:
+            pending_orders = 0
         deliveries = self.get_todays_deliveries()
+        if not deliveries:
+            deliveries = 0
         self.orders_card.update_values(f"{pending_orders}", f"Deliveries: {deliveries} Today")
 
     def setup_animations(self):
@@ -490,6 +498,13 @@ class DashboardPage(QWidget):
         sales_btn = Button("Process Sale", "💰", "success")
         customers_btn = Button("Manage Customers", "👥", "secondary")
         reports_btn = Button("Generate Reports", "📊", "info")
+        
+        # Connect button click events
+        inventory_btn.clicked.connect(lambda: self.navigate_to_page(1))  # Inventory page
+        sales_btn.clicked.connect(lambda: self.navigate_to_page(2))      # Sales page
+        customers_btn.clicked.connect(lambda: self.navigate_to_page(3))  # Customers page
+        reports_btn.clicked.connect(self.navigate_to_reports)            # Reports page
+        
         actions_grid.addWidget(inventory_btn)
         actions_grid.addWidget(sales_btn)
         actions_grid.addWidget(customers_btn)

@@ -248,8 +248,6 @@ class EnhancedGraph(QFrame):
             background-color: #ffffff;
             border-radius: 12px;
             border: 1.5px solid rgba(0, 0, 0, 0.08);
-            transition: box-shadow 0.2s, border-color 0.2s;
-            box-shadow: 0 2px 8px rgba(44, 62, 80, 0.04);
         }
         """
 
@@ -259,7 +257,6 @@ class EnhancedGraph(QFrame):
             background-color: #fafdff;
             border-radius: 12px;
             border: 2px solid #4fc3f7;
-            box-shadow: 0 4px 16px rgba(44, 62, 80, 0.10);
         }
         """
 

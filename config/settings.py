@@ -50,10 +50,10 @@ REPORT_OUTPUT_PATH = "reports/"
 
 # UI Theme settings
 DEFAULT_THEME = "light"  # Only Light theme is supported
-FONT_SIZE = "large"  # Options: small, medium, large
+FONT_SIZE = "medium"  # Options: small, medium, large
 REMEMBER_WINDOW_SIZE = True
 CONFIRM_EXIT = True
-AUTO_SAVE_INTERVAL = 10  # Minutes
+AUTO_SAVE_INTERVAL = 8  # Minutes
 
 # User Preferences
 DEFAULT_VIEW = "reports"  # Default starting view

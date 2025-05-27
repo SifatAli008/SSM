@@ -50,11 +50,12 @@ class AuthManager:
     
     def create_token(self, user_data: Dict[str, Any]) -> str:
         """Create a JWT token for the user."""
+        exp_time = int((datetime.utcnow() + self.token_expiry).timestamp())
         payload = {
             'user_id': user_data['id'],
             'username': user_data['username'],
             'role': user_data['role'],
-            'exp': datetime.utcnow() + self.token_expiry
+            'exp': exp_time
         }
         return jwt.encode(payload, self.secret_key, algorithm='HS256')
     

@@ -124,8 +124,10 @@ class CardWidget(QFrame):
         
     def update_values(self, value, subtitle=None):
         """Update the card's value and subtitle dynamically"""
+        # Always show a default value if value is None or empty
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            value = "0"
         self.value_label.setText(str(value))
-        
         if subtitle and self.subtitle_label:
             self.subtitle_label.setText(str(subtitle))
             self.subtitle_label.setVisible(True)
@@ -198,6 +200,7 @@ class CardWidget(QFrame):
 
         QLabel#cardValue {
             color: #3498db;
+            background-color: transparent;
         }
 
 
