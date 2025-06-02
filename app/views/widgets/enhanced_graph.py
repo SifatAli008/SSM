@@ -45,7 +45,6 @@ class ChartWidget(QWidget):
         self.update()
         
     def paintEvent(self, event):
-        print('ChartWidget paintEvent called')
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         width = self.width()
