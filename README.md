@@ -3,6 +3,8 @@
 A comprehensive desktop application for retail store management built with Python and PyQt5. The application provides a modern, responsive UI with intuitive controls for managing inventory, sales, customers, and generating reports.
 
 ## Recent Improvements
+- **Full migration to Firebase for inventory:** All inventory operations (CRUD, analytics, categories) are now live-synced with Firebase Realtime Database for real-time, cloud-based management
+- Removed all SQL/SQLite logic from inventory management for a fully cloud-native backend
 - Unified info card backgrounds and value text for a seamless, professional look
 - Inventory info cards now always show up-to-date values (never blank)
 - Modernized search bar in inventory view for better usability and appearance
@@ -20,6 +22,7 @@ A comprehensive desktop application for retail store management built with Pytho
 
 ### Inventory Management
 - Complete product tracking and management
+- **Live cloud sync with Firebase Realtime Database**
 - Barcode scanning support
 - Low stock alerts
 - Category management with custom categories
@@ -67,8 +70,8 @@ A comprehensive desktop application for retail store management built with Pytho
 
 - Built with Python 3.9+ and PyQt5
 - Uses Plotly for interactive charting (opens in browser)
+- **Firebase Realtime Database for all inventory data operations**
 - MVC architecture for clean separation of concerns
-- SQLite database for data storage
 - PDF generation for reports and receipts
 - Event-based communication system for real-time updates
 - Performance optimization with data caching
@@ -80,6 +83,7 @@ A comprehensive desktop application for retail store management built with Pytho
 - Python 3.9 or higher
 - PyQt5
 - Plotly
+- **Firebase account and configuration for Realtime Database**
 - Other dependencies in requirements.txt
 
 ### Installation
@@ -105,7 +109,11 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. Run the application
+4. Configure Firebase
+- Set up your Firebase project and Realtime Database
+- Add your Firebase configuration to the app (see `config/` or documentation)
+
+5. Run the application
 ```bash
 python run.py
 ```
@@ -119,6 +127,7 @@ python run_tests.py
 ### Troubleshooting
 - If you see errors about missing packages, make sure your virtual environment is activated before running `pip install` or `python run.py`.
 - If you have issues with PyQt5 on Linux, you may need to install system dependencies (see PyQt5 docs).
+- For Firebase issues, ensure your configuration is correct and the Realtime Database is enabled.
 
 ## Documentation
 
