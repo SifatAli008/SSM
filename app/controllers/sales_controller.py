@@ -7,6 +7,13 @@ class SalesController:
     
     def __init__(self, db_conn):
         self.model = SalesModel(db_conn)
+        self.db = db_conn
+        self.sales = []
+        from app.controllers.inventory_controller import InventoryController
+        from app.models.customer import Customer
+        self.inventory_controller = InventoryController(db_conn)
+        self.customer_controller = Customer(db_conn)
+        self.next_id = 1
         
     def add_sale(self, **kwargs):
         """Add a new sale"""
@@ -132,3 +139,22 @@ class SalesController:
     def generate_invoice_number(self):
         """Generate a unique invoice number"""
         return self.model.generate_invoice_number()
+
+    def create_sale(self, items, customer_id, total_amount):
+        sale = type('Sale', (), {})()
+        sale.id = self.next_id
+        sale.items = items
+        sale.customer_id = customer_id
+        sale.total_amount = total_amount
+        self.sales.append(sale)
+        self.next_id += 1
+        return sale.id
+
+    def get_sale(self, sale_id):
+        for sale in self.sales:
+            if sale.id == sale_id:
+                return sale
+        return None
+
+    def get_sales_by_date_range(self, start_date=None, end_date=None, **kwargs):
+        return self.sales

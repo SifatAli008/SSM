@@ -94,40 +94,49 @@ class ConfigManager:
         return config
     
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a configuration value."""
+        if not key or not isinstance(key, str):
+            raise ValueError("Invalid key format")
+        keys = key.split('.')
+        value = self.config
         try:
-            value = self.config
-            for k in key.split('.'):
-                value = getattr(value, k)
+            for k in keys:
+                if isinstance(value, dict):
+                    value = value[k]
+                else:
+                    value = getattr(value, k)
+            # Type conversion
+            if isinstance(value, str):
+                if value.isdigit():
+                    return int(value)
+                try:
+                    return float(value)
+                except Exception:
+                    pass
+                if value.lower() in ("true", "false"):
+                    return value.lower() == "true"
             return value
-        except (AttributeError, KeyError):
+        except Exception:
             return default
     
     def set(self, key: str, value: Any) -> bool:
-        """Set a configuration value."""
-        try:
-            keys = key.split('.')
-            config_dict = self.config.model_dump()
-            current = config_dict
-            
-            # Navigate to the nested dictionary
-            for k in keys[:-1]:
-                if k not in current:
-                    current[k] = {}
-                current = current[k]
-            
-            # Set the value
-            current[keys[-1]] = value
-            
-            # Update the config
-            self.config = AppConfig(**config_dict)
-            
-            # Save to file
-            self._save_config()
-            return True
-        except Exception as e:
-            logger.error(f"Error setting config value: {e}")
-            return False
+        if not key or not isinstance(key, str):
+            raise ValueError("Invalid key format")
+        keys = key.split('.')
+        d = self.config
+        for k in keys[:-1]:
+            if isinstance(d, dict):
+                if k not in d:
+                    d[k] = {}
+                d = d[k]
+            else:
+                if not hasattr(d, k):
+                    setattr(d, k, {})
+                d = getattr(d, k)
+        if isinstance(d, dict):
+            d[keys[-1]] = value
+        else:
+            setattr(d, keys[-1], value)
+        return True
     
     def _save_config(self):
         """Save configuration to file."""
@@ -138,28 +147,30 @@ class ConfigManager:
             logger.error(f"Error saving config: {e}")
     
     def get_all(self) -> dict:
-        """Get the entire configuration."""
-        return self.config.model_dump()
+        if hasattr(self.config, 'model_dump'):
+            return self.config.model_dump()
+        return dict(self.config)
     
     def update(self, new_config: dict) -> bool:
-        """Update multiple configuration values at once."""
-        try:
-            self.config = AppConfig(**new_config)
-            self._save_config()
-            return True
-        except Exception as e:
-            logger.error(f"Error updating config: {e}")
-            return False
+        def deep_update(d, u):
+            for k, v in u.items():
+                if isinstance(v, dict):
+                    d[k] = deep_update(d.get(k, {}), v)
+                else:
+                    d[k] = v
+            return d
+        if isinstance(self.config, dict):
+            self.config = deep_update(self.config, new_config)
+        else:
+            for k, v in new_config.items():
+                setattr(self.config, k, v)
+        self._save_config()
+        return True
     
     def reset_to_default(self) -> bool:
-        """Reset configuration to default values."""
-        try:
-            self.config = AppConfig()
-            self._save_config()
-            return True
-        except Exception as e:
-            logger.error(f"Error resetting config: {e}")
-            return False
+        self.config = self._create_default_config()
+        self._save_config()
+        return True
     
     def validate_config(self) -> tuple[bool, list[str]]:
         """Validate the current configuration."""
@@ -168,6 +179,9 @@ class ConfigManager:
             return True, []
         except Exception as e:
             return False, [str(e)]
+
+    def load_config(self, config):
+        self.config = config
 
 # Singleton instance for easy import
 config_manager = ConfigManager() 

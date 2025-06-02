@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QGroupBox, QLineEdit, QSizePolicy, QDialog, QFormLayout, QMessageBox,
     QTableView, QHeaderView, QAbstractItemView, QComboBox, QFileDialog,
     QCheckBox, QSpacerItem, QFrame, QToolButton, QApplication, QStyledItemDelegate,
-    QItemDelegate, QTextEdit, QInputDialog
+    QItemDelegate, QTextEdit, QInputDialog, QSpinBox, QTableWidget, QDoubleSpinBox
 )
 from PyQt5.QtCore import Qt, QTimer, QDateTime, QSortFilterProxyModel, pyqtSlot, QSize, QPropertyAnimation
 from PyQt5.QtGui import QFont, QIntValidator, QDoubleValidator, QIcon, QColor, QPixmap
@@ -120,6 +120,16 @@ class InventoryView(QWidget):
 
         self.snackbar = Snackbar(self)
         self.snackbar.hide()
+
+        self.name_input = QLineEdit()
+        self.quantity_input = QSpinBox()
+        self.price_input = QDoubleSpinBox()
+        self.category_input = QLineEdit()
+        self.add_button = QPushButton()
+        self.product_table = QTableWidget()
+        self.edit_button = QPushButton()
+        self.save_button = QPushButton()
+        self.search_input = QLineEdit()
 
         self.init_ui()
 

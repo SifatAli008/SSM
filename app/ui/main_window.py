@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QTabWidget
+from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QTabWidget, QMenuBar, QMenu
 from PyQt5.QtCore import Qt
 from app.utils.logger import logger
 from app.core.auth import AuthManager
@@ -9,32 +9,35 @@ from app.core.inventory import InventoryManager
 from app.core.sales import SalesManager
 from app.core.users import UserManager
 
+class DummyEventSystem:
+    def subscribe(self, event, handler):
+        pass
+
 class MainWindow(QMainWindow):
-    def __init__(
-        self,
-        auth_manager: AuthManager,
-        event_system: EventSystem,
-        backup_manager: BackupManager,
-        report_manager: ReportManager,
-        inventory_manager: InventoryManager,
-        sales_manager: SalesManager,
-        user_manager: UserManager
-    ):
+    def __init__(self, auth_manager=None, event_system=None, backup_manager=None, report_manager=None, inventory_manager=None, sales_manager=None, user_manager=None):
         super().__init__()
+        self.setWindowTitle("Smart Shop Manager")
         self.auth_manager = auth_manager
-        self.event_system = event_system
+        self.event_system = event_system or DummyEventSystem()
         self.backup_manager = backup_manager
         self.report_manager = report_manager
         self.inventory_manager = inventory_manager
         self.sales_manager = sales_manager
         self.user_manager = user_manager
         
+        menubar = QMenuBar(self)
+        self.setMenuBar(menubar)
+        self.menus = {}
+        for menu_name in ["File", "Edit", "View", "Help"]:
+            menu = QMenu(menu_name, menubar)
+            menubar.addMenu(menu)
+            self.menus[menu_name] = menu
+        
         self.setup_ui()
         self.setup_event_handlers()
     
     def setup_ui(self):
         """Set up the main window UI."""
-        self.setWindowTitle("Smart Shop Manager")
         self.setMinimumSize(1024, 768)
         
         # Create central widget and layout

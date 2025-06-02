@@ -1,9 +1,9 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, 
     QFrame, QGridLayout, QSizePolicy, QSpacerItem, QFileDialog, QMessageBox, QComboBox,
-    QScrollArea
+    QScrollArea, QDateEdit
 )
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QDate
 from PyQt5.QtGui import QFont, QIcon, QColor
 from PyQt5.QtWidgets import QApplication
 
@@ -113,6 +113,11 @@ class ReportsView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.controller = ReportsController()
+        self.start_date = QDateEdit()
+        self.end_date = QDateEdit()
+        self.generate_button = QPushButton()
+        self.export_button = QPushButton()
+        self.current_report = object()
         self.init_ui()
         self.connect_signals()
         self.load_data()

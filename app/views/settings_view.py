@@ -19,6 +19,7 @@ from PyQt5.QtGui import QFont, QIcon, QColor
 from app.views.widgets.components import PageHeader, Card, Button, ComboBox
 from app.views.widgets.layouts import SplitLayout, PageLayout
 from app.utils.theme_manager import ThemeManager, ThemeType
+from app.controllers.user_controller import UserController
 
 import os
 import sys
@@ -182,9 +183,20 @@ class ThemeSelector(QWidget):
 class SettingsView(QWidget):
     """Dedicated settings page for application configuration"""
     
-    def __init__(self, parent=None):
+    def __init__(self, controller=None, parent=None):
         super().__init__(parent)
+        self.controller = controller
         self.parent_window = parent
+        self.theme_combo = QComboBox()
+        self.language_combo = QComboBox()
+        self.language_combo.addItems(["English", "Spanish", "French"])
+        self.username_input = QLineEdit()
+        self.password_input = QLineEdit()
+        self.role_combo = QComboBox()
+        self.create_user_button = QPushButton()
+        self.save_settings_button = QPushButton()
+        self.current_theme = "Dark"
+        self.current_language = "English"
         self.init_ui()
         self.load_settings()
     

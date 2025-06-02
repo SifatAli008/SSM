@@ -91,13 +91,17 @@ class CacheManager:
             self._hits += 1
             return entry.get_value()
     
-    def set(self, key, value, ttl_seconds=300):
+    def set(self, key, value, ttl=None, ttl_seconds=None):
         """
         Set a value in the cache with an optional time-to-live.
         Default TTL is 5 minutes (300 seconds).
         """
+        if ttl is None and ttl_seconds is None:
+            ttl = 300
+        if ttl_seconds is not None:
+            ttl = ttl_seconds
         with self._lock:
-            self._cache[key] = CacheEntry(value, ttl_seconds)
+            self._cache[key] = CacheEntry(value, ttl)
     
     def delete(self, key):
         """Delete a specific key from the cache"""

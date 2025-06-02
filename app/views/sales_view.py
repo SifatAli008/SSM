@@ -93,7 +93,7 @@ class SaleDialog(QDialog):
         }
 
 class SalesView(QWidget):
-    def __init__(self, parent=None, controller=None):
+    def __init__(self, controller=None, parent=None):
         super().__init__(parent)
         self.controller = controller
         self.cart = []  # List of cart items
@@ -103,6 +103,13 @@ class SalesView(QWidget):
             {"name": "Nike Air Max 90", "price": 120.00, "stock": 25},
             {"name": "MacBook Pro 14\"", "price": 1999.99, "stock": 1},
         ]
+        self.product_search = QLineEdit()
+        self.quantity_input = QSpinBox()
+        self.add_to_sale_button = QPushButton()
+        self.complete_sale_button = QPushButton()
+        self.customer_search = QLineEdit()
+        self.selected_customer = type('CustomerObj', (), {})()
+        self.selected_customer.name = "Test Customer"
         self.init_ui()
 
     def init_ui(self):

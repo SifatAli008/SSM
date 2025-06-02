@@ -327,6 +327,23 @@ class MainWindow(QMainWindow):
         # Change to new page
         self.content_stack.setCurrentIndex(index)
         
+        # --- Ensure backend sync on every navigation ---
+        # Call refresh method for the page being shown
+        page_widget = self.content_stack.widget(index)
+        if index == 0 and hasattr(page_widget, 'refresh_dashboard_data'):
+            page_widget.refresh_dashboard_data()
+        elif index == 1 and hasattr(page_widget, 'refresh_data'):
+            page_widget.refresh_data()
+        elif index == 2 and hasattr(page_widget, 'refresh_data'):
+            page_widget.refresh_data()
+        elif index == 3 and hasattr(page_widget, 'refresh_data'):
+            page_widget.refresh_data()
+        elif index == 4 and hasattr(page_widget, 'refresh_data'):
+            page_widget.refresh_data()
+        elif index == 5 and hasattr(page_widget, 'refresh_settings'):
+            page_widget.refresh_settings()
+        # --- End backend sync addition ---
+        
         # Update page title
         page_titles = [
             "Dashboard",

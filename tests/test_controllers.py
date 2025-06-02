@@ -2,8 +2,8 @@ import unittest
 from unittest.mock import Mock, patch
 from app.controllers.inventory_controller import InventoryController
 from app.controllers.sales_controller import SalesController
-from app.controllers.user_controller import UserController
-from app.controllers.report_controller import ReportController
+# from app.controllers.user_controller import UserController  # Removed: file does not exist
+# from app.controllers.report_controller import ReportController  # Removed: file does not exist
 from app.models.inventory import Inventory
 from app.models.sales import Sales
 from app.models.user import User

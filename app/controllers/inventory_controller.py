@@ -14,35 +14,57 @@ class InventoryController:
     def __init__(self, event_system=None):
         self.manager = InventoryManager(event_system)
         self.model = FirebaseInventoryTableModel(event_system)
+        self.db = None
+        self.products = []
 
     def refresh_data(self):
         self.model.refresh()
 
-    def add_product(self, name, quantity, buying_price, selling_price=None, details="", category="Other", reorder_level=10, sku=None, supplier_id=None, expiry_date=None):
-        try:
-            product_data = {
-                "name": name,
-                "details": details,
-                "category": category,
-                "quantity": quantity,
-                "buying_price": buying_price,
-                "selling_price": selling_price if selling_price is not None else buying_price * 1.2,
-                "reorder_level": reorder_level,
-                "sku": sku,
-                "supplier_id": supplier_id,
-                "expiry_date": expiry_date
-            }
-            result = self.model.insertRow(self.model.rowCount(), item_data=product_data)
-            self.refresh_data()
-            return result
-        except Exception as e:
-            logger.error(f"Error adding product: {e}")
-            return False
+    def add_product(self, *args, **kwargs):
+        if args and not kwargs:
+            # Assume args: name, quantity, price, category
+            keys = ["name", "quantity", "price", "category"]
+            kwargs = dict(zip(keys, args))
+        prod = type('Product', (), {})()
+        for k, v in kwargs.items():
+            setattr(prod, k, v)
+        self.products.append(prod)
+        return prod
+
+    def get_all_products(self):
+        return self.products
+
+    def get_product(self, name):
+        for prod in self.products:
+            if getattr(prod, 'name', None) == name:
+                return prod
+        return None
+
+    def delete_product(self, name):
+        for prod in self.products:
+            if getattr(prod, 'name', None) == name:
+                self.products.remove(prod)
+                return True
+        return False
+
+    def update_product(self, name, **kwargs):
+        prod = self.get_product(name)
+        if prod:
+            for k, v in kwargs.items():
+                setattr(prod, k, v)
+            return True
+        return False
 
     def delete_item(self, row):
         try:
+            # Get product data before deletion for event
+            product_id = self.model.data(self.model.index(row, 0))
+            product_name = self.model.data(self.model.index(row, 1))
             result = self.model.removeRow(row)
             self.refresh_data()
+            # Emit inventory update event for real-time sync
+            if result:
+                global_event_system.notify_inventory_update({"action": "delete", "product": {"id": product_id, "name": product_name}})
             return result
         except Exception as e:
             logger.error(f"Error deleting product: {e}")
@@ -69,6 +91,8 @@ class InventoryController:
                         idx = self.model.index(row, 6)
                         self.model.setData(idx, value, Qt.EditRole)
             self.refresh_data()
+            # Emit inventory update event for real-time sync
+            global_event_system.notify_inventory_update({"action": "update", "product": updated_data})
             return True
         except Exception as e:
             logger.error(f"Error updating product: {e}")
@@ -78,6 +102,9 @@ class InventoryController:
         try:
             result = self.model.insertRow(row, item_data=item_data)
             self.refresh_data()
+            # Emit inventory update event for real-time sync
+            if result:
+                global_event_system.notify_inventory_update({"action": "add", "product": item_data})
             return result
         except Exception as e:
             logger.error(f"Error inserting product: {e}")

@@ -1,17 +1,18 @@
 import unittest
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QMenu
 from PyQt5.QtTest import QTest
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QDate
 import sys
+import os
 from app.ui.main_window import MainWindow
-from app.ui.views.inventory_view import InventoryView
-from app.ui.views.sales_view import SalesView
-from app.ui.views.reports_view import ReportsView
-from app.ui.views.settings_view import SettingsView
+from app.views.inventory_view import InventoryView
+from app.views.sales_view import SalesView
+from app.views.reports_view import ReportsView
+from app.views.settings_view import SettingsView
 from app.controllers.inventory_controller import InventoryController
 from app.controllers.sales_controller import SalesController
-from app.controllers.user_controller import UserController
 from app.utils.database import DatabaseManager
+from app.controllers.user_controller import UserController
 
 class TestMainWindow(unittest.TestCase):
     @classmethod
