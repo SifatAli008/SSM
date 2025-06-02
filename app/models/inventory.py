@@ -1,9 +1,10 @@
-# ARCHIVED: Not used in current PyQt/SQLite inventory system.
-'''
 from datetime import datetime
 from config.database import FirebaseDB
 from config.settings import COLLECTION_INVENTORY
+from PyQt5.QtCore import QAbstractTableModel, Qt, QModelIndex, QVariant
+from app.core.inventory import InventoryManager
 
+# --- Optionally keep InventoryItem for reference, but not as the main export ---
 class InventoryItem:
     def __init__(self, item_id=None, name=None, description=None, category=None,
                 quantity=0, cost_price=0.0, selling_price=0.0, 
@@ -136,4 +137,122 @@ class InventoryItem:
         items_ref = db.get_collection(COLLECTION_INVENTORY)
         db.delete_document(items_ref, self.item_id)
         return True
-'''
+
+class FirebaseInventoryTableModel(QAbstractTableModel):
+    headers = [
+        "ID", "Product Name", "Product Details", "Category", "Quantity", "Buying Price", "Selling Price"
+    ]
+
+    def __init__(self, event_system=None, parent=None):
+        super().__init__(parent)
+        self.manager = InventoryManager(event_system)
+        self.items = []  # List of dicts or objects
+        self.item_ids = []  # Firebase keys
+        self.load_data()
+
+    def load_data(self):
+        self.beginResetModel()
+        products = self.manager.list_products()
+        self.items = []
+        self.item_ids = []
+        for prod in products:
+            # prod can be a dict or a Product object
+            if hasattr(prod, 'dict'):
+                data = prod.dict()
+            elif hasattr(prod, '__dict__'):
+                data = prod.__dict__
+            else:
+                data = dict(prod)
+            self.items.append(data)
+            self.item_ids.append(data.get('id') or data.get('item_id'))
+        self.endResetModel()
+
+    def rowCount(self, parent=QModelIndex()):
+        return len(self.items)
+
+    def columnCount(self, parent=QModelIndex()):
+        return len(self.headers)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid() or not (0 <= index.row() < len(self.items)):
+            return QVariant()
+        item = self.items[index.row()]
+        col = index.column()
+        if role in (Qt.DisplayRole, Qt.EditRole):
+            if col == 0:
+                return self.item_ids[index.row()] or ""
+            elif col == 1:
+                return item.get("name", "")
+            elif col == 2:
+                return item.get("details", item.get("description", ""))
+            elif col == 3:
+                return item.get("category", "Other")
+            elif col == 4:
+                return item.get("quantity", item.get("stock", 0))
+            elif col == 5:
+                return item.get("buying_price", item.get("cost_price", 0.0))
+            elif col == 6:
+                return item.get("selling_price", 0.0)
+        return QVariant()
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+            if 0 <= section < len(self.headers):
+                return self.headers[section]
+        return QVariant()
+
+    def flags(self, index):
+        if not index.isValid():
+            return Qt.ItemIsEnabled
+        return Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable
+
+    def setData(self, index, value, role=Qt.EditRole):
+        if not index.isValid() or role != Qt.EditRole:
+            return False
+        row = index.row()
+        col = index.column()
+        item_id = self.item_ids[row]
+        item = self.items[row]
+        key_map = {
+            1: "name",
+            2: "details",
+            3: "category",
+            4: "quantity",
+            5: "buying_price",
+            6: "selling_price"
+        }
+        if col in key_map:
+            field = key_map[col]
+            item[field] = value
+            # Update in Firebase
+            self.manager.update_product(item_id, {field: value})
+            self.dataChanged.emit(index, index, [Qt.DisplayRole, Qt.EditRole])
+            return True
+        return False
+
+    def insertRow(self, row, parent=QModelIndex(), item_data=None):
+        self.beginInsertRows(QModelIndex(), row, row)
+        prod_id = self.manager.create_product(item_data)
+        if prod_id:
+            item_data = dict(item_data)
+            item_data['id'] = prod_id
+            self.items.insert(row, item_data)
+            self.item_ids.insert(row, prod_id)
+            self.endInsertRows()
+            return True
+        self.endInsertRows()
+        return False
+
+    def removeRow(self, row, parent=QModelIndex()):
+        if not (0 <= row < len(self.items)):
+            return False
+        self.beginRemoveRows(QModelIndex(), row, row)
+        item_id = self.item_ids[row]
+        self.manager.delete_product(item_id)
+        del self.items[row]
+        del self.item_ids[row]
+        self.endRemoveRows()
+        return True
+
+    def refresh(self):
+        self.load_data()

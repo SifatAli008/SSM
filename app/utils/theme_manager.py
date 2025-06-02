@@ -378,12 +378,14 @@ class ThemeManager:
                 border-top-left-radius: {cls.BORDER_RADIUS['small']}px;
                 border-top-right-radius: {cls.BORDER_RADIUS['small']}px;
                 margin-right: 2px;
+                color: #111;
             }}
             
             QTabBar::tab:selected {{
-                background-color: {c["primary"]};
-                color: white;
+                background-color: {c["card"]};
+                color: #111;
                 border-bottom-color: {c["card"]};
+                font-weight: bold;
             }}
             
             QTabBar::tab:hover:!selected {{

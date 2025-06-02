@@ -11,6 +11,7 @@ from app.utils.logger import logger
 from app.utils.config_manager import config_manager
 from app.utils.database import db_manager
 from app.core.event_system import EventSystem, EventTypes
+from app.ui.firebase_utils import get_db
 
 class ReportManager:
     def __init__(self, event_system: EventSystem):
@@ -24,107 +25,36 @@ class ReportManager:
         logger.info(f"Report directory set up: {report_dir}")
     
     def generate_sales_report(self, start_date: datetime, end_date: datetime, format: str = 'pdf') -> Optional[str]:
-        """Generate sales report for a date range."""
+        """Generate sales report for a date range from Firebase."""
         try:
-            with db_manager.get_session() as session:
-                # Query sales data
-                sales_data = session.execute("""
-                    SELECT 
-                        s.id,
-                        s.created_at,
-                        u.username,
-                        s.total_amount,
-                        s.payment_method,
-                        s.status,
-                        COUNT(si.id) as items_count
-                    FROM sales s
-                    JOIN users u ON s.user_id = u.id
-                    JOIN sale_items si ON s.id = si.sale_id
-                    WHERE s.created_at BETWEEN :start_date AND :end_date
-                    GROUP BY s.id
-                    ORDER BY s.created_at DESC
-                """, {
-                    'start_date': start_date,
-                    'end_date': end_date
-                }).fetchall()
-                
-                if not sales_data:
-                    logger.warning("No sales data found for the specified date range")
-                    return None
-                
-                # Convert to DataFrame
-                df = pd.DataFrame(sales_data, columns=[
-                    'ID', 'Date', 'User', 'Amount', 'Payment Method',
-                    'Status', 'Items Count'
-                ])
-                
-                # Generate report
-                report_file = self._generate_report(
-                    df,
-                    'sales_report',
-                    start_date,
-                    end_date,
-                    format
-                )
-                
-                # Publish event
-                self.event_system.publish(EventTypes.SYSTEM_REPORT_GENERATED, {
-                    'report_type': 'sales',
-                    'report_file': report_file,
-                    'start_date': start_date.isoformat(),
-                    'end_date': end_date.isoformat()
-                })
-                
-                return report_file
+            sales_data = get_db().child('sales').get().val() or {}
+            sales = []
+            for v in sales_data.values():
+                sale_date = pd.to_datetime(v.get('sale_date'))
+                if start_date <= sale_date <= end_date:
+                    sales.append(v)
+            if not sales:
+                logger.warning("No sales data found for the specified date range")
+                return None
+            df = pd.DataFrame(sales)
+            report_file = self._generate_report(df, 'sales_report', start_date, end_date, format)
+            return report_file
         except Exception as e:
             logger.error(f"Failed to generate sales report: {e}")
             return None
     
     def generate_inventory_report(self, format: str = 'pdf') -> Optional[str]:
-        """Generate inventory status report."""
+        """Generate inventory status report from Firebase."""
         try:
-            with db_manager.get_session() as session:
-                # Query inventory data
-                inventory_data = session.execute("""
-                    SELECT 
-                        p.id,
-                        p.name,
-                        p.category,
-                        p.sku,
-                        p.stock,
-                        p.min_stock,
-                        p.price,
-                        p.cost
-                    FROM products p
-                    ORDER BY p.category, p.name
-                """).fetchall()
-                
-                if not inventory_data:
-                    logger.warning("No inventory data found")
-                    return None
-                
-                # Convert to DataFrame
-                df = pd.DataFrame(inventory_data, columns=[
-                    'ID', 'Name', 'Category', 'SKU', 'Stock',
-                    'Min Stock', 'Price', 'Cost'
-                ])
-                
-                # Generate report
-                report_file = self._generate_report(
-                    df,
-                    'inventory_report',
-                    datetime.now(),
-                    datetime.now(),
-                    format
-                )
-                
-                # Publish event
-                self.event_system.publish(EventTypes.SYSTEM_REPORT_GENERATED, {
-                    'report_type': 'inventory',
-                    'report_file': report_file
-                })
-                
-                return report_file
+            inventory_data = get_db().child('inventory').get().val() or {}
+            inventory = list(inventory_data.values())
+            if not inventory:
+                logger.warning("No inventory data found")
+                return None
+            df = pd.DataFrame(inventory)
+            now = datetime.now()
+            report_file = self._generate_report(df, 'inventory_report', now, now, format)
+            return report_file
         except Exception as e:
             logger.error(f"Failed to generate inventory report: {e}")
             return None
@@ -168,42 +98,27 @@ class ReportManager:
         elements.append(date_range)
         elements.append(Spacer(1, 12))
         
-        # Add summary statistics
-        if report_type == 'sales_report':
-            total_sales = df['Amount'].sum()
-            avg_sale = df['Amount'].mean()
-            total_items = df['Items Count'].sum()
-            
-            summary = [
-                f"Total Sales: ${total_sales:.2f}",
-                f"Average Sale: ${avg_sale:.2f}",
-                f"Total Items Sold: {total_items}"
-            ]
-            
-            for stat in summary:
-                elements.append(Paragraph(stat, styles['Normal']))
-            elements.append(Spacer(1, 12))
-        
         # Add data table
-        data = [df.columns.tolist()] + df.values.tolist()
-        table = Table(data)
-        
-        # Add table style
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 14),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 12),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        
-        elements.append(table)
+        if not df.empty:
+            data = [df.columns.tolist()] + df.values.tolist()
+            table = Table(data)
+            
+            # Add table style
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 14),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            elements.append(table)
         
         # Build PDF
         doc.build(elements)

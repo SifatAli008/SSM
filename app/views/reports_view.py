@@ -11,6 +11,9 @@ from app.controllers.reports_controller import ReportsController
 from app.utils.logger import logger
 from app.utils.theme_manager import ThemeManager
 from app.views.widgets.components import Card, Button
+from app.views.widgets.layouts import TabsLayout
+from app.views.widgets.enhanced_graph import ChartWidget
+from app.views.widgets.card_widget import CardWidget
 import os
 
 class ReportCard(Card):
@@ -116,413 +119,51 @@ class ReportsView(QWidget):
     
     def init_ui(self):
         self.setWindowTitle("Reports & Analytics")
-        
-        # Create scrollable area for responsiveness
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setFrameShape(QFrame.NoFrame)
-        
-        # Container widget for the scroll area
-        scroll_content = QWidget()
-        
-        # Main layout
-        main_layout = QVBoxLayout(scroll_content)
+        main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(25)  # Increased spacing
-        
-        # Page title and time period selector
-        title_layout = QHBoxLayout()
-        
-        # Page title
-        page_title = QLabel("Reports & Analytics Dashboard")
-        page_title.setObjectName("page-title")
-        page_title.setFont(QFont(ThemeManager.FONTS["family"], 24, QFont.Bold))  # Fixed size
-        title_layout.addWidget(page_title)
-        
-        title_layout.addStretch()
-        
-        # Period selector
-        period_layout = QHBoxLayout()
-        period_layout.setSpacing(10)
-        
-        period_label = QLabel("Time Period:")
-        period_label.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        period_label.setStyleSheet("color: #333333;")
-        
+        main_layout.setSpacing(24)
+
+        # Page header
+        header = QLabel("Reports & Analytics")
+        header.setFont(QFont(ThemeManager.FONTS["family"], 28, QFont.Bold))
+        main_layout.addWidget(header)
+        subtitle = QLabel("Comprehensive business insights and performance metrics")
+        subtitle.setStyleSheet("color: #888;")
+        main_layout.addWidget(subtitle)
+
+        # Top right controls (period, export, print)
+        controls_row = QHBoxLayout()
+        controls_row.addStretch()
         self.period_combo = QComboBox()
-        self.period_combo.addItems(["Today", "Last 7 Days", "Last 30 Days", "This Month", "This Year"])
-        self.period_combo.setCurrentIndex(2)  # Default to Last 30 Days
-        self.period_combo.setFixedWidth(150)
-        self.period_combo.setMinimumHeight(38)
-        self.period_combo.setFont(QFont(ThemeManager.FONTS["family"], 12))
-        
-        # Refresh button
-        self.refresh_btn = Button("Refresh", variant="success")
-        self.refresh_btn.setFont(QFont(ThemeManager.FONTS["family"], 12))
-        
-        period_layout.addWidget(period_label)
-        period_layout.addWidget(self.period_combo)
-        period_layout.addWidget(self.refresh_btn)
-        
-        title_layout.addLayout(period_layout)
-        main_layout.addLayout(title_layout)
-        
-        # Summary metrics
-        summary_layout = QGridLayout()
-        summary_layout.setHorizontalSpacing(20)  # Increased spacing
-        summary_layout.setVerticalSpacing(20)
-        
-        # Create summary cards
-        self.sales_card = ReportCard("Total Sales", "$0", "💰", ThemeManager.get_color('warning'))
-        self.inventory_card = ReportCard("Inventory Value", "$0", "📦", ThemeManager.get_color('primary'))
-        self.profit_card = ReportCard("Net Profit", "$0", "📈", ThemeManager.get_color('success'))
-        self.expenses_card = ReportCard("Total Expenses", "$0", "📉", ThemeManager.get_color('danger'))
-        
-        # Set column stretching for responsiveness
-        summary_layout.setColumnStretch(0, 1)
-        summary_layout.setColumnStretch(1, 1)
-        
-        summary_layout.addWidget(self.sales_card, 0, 0)
-        summary_layout.addWidget(self.inventory_card, 0, 1)
-        summary_layout.addWidget(self.profit_card, 1, 0)
-        summary_layout.addWidget(self.expenses_card, 1, 1)
-        
-        main_layout.addLayout(summary_layout)
-        
-        # Sales Reports Section
-        sales_header = SectionHeader("SALES REPORTS", "📊")
-        sales_header.print_btn.clicked.connect(self.generate_sales_report)
-        main_layout.addWidget(sales_header)
-        
-        sales_grid = QGridLayout()
-        sales_grid.setHorizontalSpacing(20)
-        
-        # Configure column stretching
-        sales_grid.setColumnStretch(0, 1)
-        sales_grid.setColumnStretch(1, 1)
-        sales_grid.setColumnStretch(2, 1)
-        
-        # Sales summary card
-        self.sales_summary = DetailCard("💰 Sales Summary")
-        sales_summary_layout = QVBoxLayout()
-        sales_summary_layout.setSpacing(12)  # Increased spacing
-        
-        self.total_sales_label = QLabel("Total Sales: $0")
-        self.total_sales_label.setStyleSheet("color: #333333; background-color: transparent; font-weight: bold;")
-        self.total_sales_label.setFont(QFont(ThemeManager.FONTS["family"], 14))
-        
-        self.avg_order_label = QLabel("Avg Order: $0")
-        self.avg_order_label.setStyleSheet("color: #333333; background-color: transparent;")
-        self.avg_order_label.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        self.orders_label = QLabel("Orders: 0")
-        self.orders_label.setStyleSheet("color: #333333; background-color: transparent;")
-        self.orders_label.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        sales_summary_layout.addWidget(self.total_sales_label)
-        sales_summary_layout.addWidget(self.avg_order_label)
-        sales_summary_layout.addWidget(self.orders_label)
-        sales_summary_layout.addStretch()
-        
-        self.sales_summary.layout.addLayout(sales_summary_layout)
-        
-        # Growth card
-        growth = DetailCard("Growth")
-        growth_layout = QVBoxLayout()
-        growth_layout.setSpacing(12)
-        
-        growth_value = QLabel("↗ +12%")
-        growth_value.setStyleSheet(f"color: {ThemeManager.get_color('success')}; font-weight: bold; background-color: transparent;")
-        growth_value.setFont(QFont(ThemeManager.FONTS["family"], 20, QFont.Bold))
-        
-        growth_weekly = QLabel("Weekly & Monthly Growth: ↗")
-        growth_weekly.setStyleSheet("color: #333333; background-color: transparent;")
-        growth_weekly.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        growth_peak = QLabel("Peak Sales Hours: 5 to 3 pm")
-        growth_peak.setStyleSheet("color: #333333; background-color: transparent;")
-        growth_peak.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        growth_layout.addWidget(growth_value)
-        growth_layout.addWidget(growth_weekly)
-        growth_layout.addWidget(growth_peak)
-        growth_layout.addStretch()
-        
-        growth.layout.addLayout(growth_layout)
-        
-        # Best-selling items card
-        best_selling = DetailCard("🌟 Best-Selling Items")
-        best_selling_layout = QVBoxLayout()
-        best_selling_layout.setSpacing(12)
-        
-        top_seller = QLabel("Top Seller: 📱P-X")
-        top_seller.setStyleSheet("color: #3366CC; font-weight: bold; background-color: transparent;")
-        top_seller.setFont(QFont(ThemeManager.FONTS["family"], 14))
-        
-        sales_inc = QLabel("Sales inc: ↗ +8%")
-        sales_inc.setStyleSheet("color: #33AA33; background-color: transparent;")
-        sales_inc.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        category = QLabel("Category-Wise Sales")
-        category.setStyleSheet("color: #333333; background-color: transparent;")
-        category.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        best_selling_layout.addWidget(top_seller)
-        best_selling_layout.addWidget(sales_inc)
-        best_selling_layout.addWidget(category)
-        best_selling_layout.addStretch()
-        
-        best_selling.layout.addLayout(best_selling_layout)
-        
-        sales_grid.addWidget(self.sales_summary, 0, 0)
-        sales_grid.addWidget(growth, 0, 1)
-        sales_grid.addWidget(best_selling, 0, 2)
-        
-        main_layout.addLayout(sales_grid)
-        
-        # Inventory Reports Section
-        inventory_header = SectionHeader("INVENTORY REPORTS", "📦")
-        inventory_header.print_btn.clicked.connect(self.generate_inventory_report)
-        main_layout.addWidget(inventory_header)
-        
-        inventory_grid = QGridLayout()
-        inventory_grid.setHorizontalSpacing(20)
-        
-        # Configure column stretching
-        inventory_grid.setColumnStretch(0, 1)
-        inventory_grid.setColumnStretch(1, 1)
-        inventory_grid.setColumnStretch(2, 1)
-        
-        # Inventory overview card
-        self.inventory_overview = DetailCard("📦 Inventory Overview")
-        inventory_layout = QVBoxLayout()
-        inventory_layout.setSpacing(12)
-        
-        self.stock_value_label = QLabel("Stock Value: $0")
-        self.stock_value_label.setStyleSheet("color: #333333; background-color: transparent; font-weight: bold;")
-        self.stock_value_label.setFont(QFont(ThemeManager.FONTS["family"], 14))
-        
-        self.total_items_label = QLabel("Total Items: 0")
-        self.total_items_label.setStyleSheet("color: #333333; background-color: transparent;")
-        self.total_items_label.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        total_cartons = QLabel("Total cartons: 18")
-        total_cartons.setStyleSheet("color: #333333; background-color: transparent;")
-        total_cartons.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        inventory_layout.addWidget(self.stock_value_label)
-        inventory_layout.addWidget(self.total_items_label)
-        inventory_layout.addWidget(total_cartons)
-        inventory_layout.addStretch()
-        
-        self.inventory_overview.layout.addLayout(inventory_layout)
-        
-        # Low stock alerts card
-        self.low_stock = DetailCard("🔴 Low Stock Alerts")
-        low_stock_layout = QVBoxLayout()
-        low_stock_layout.setSpacing(12)
-        
-        self.low_stock_label = QLabel("Low Stock: 0 items")
-        self.low_stock_label.setStyleSheet("color: #FF3333; font-weight: bold; background-color: transparent;")
-        self.low_stock_label.setFont(QFont(ThemeManager.FONTS["family"], 14))
-        
-        expiring = QLabel("Expiring: 🔔 3 items")
-        expiring.setStyleSheet("color: #FF9900; background-color: transparent;")
-        expiring.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        low_stock_layout.addWidget(self.low_stock_label)
-        low_stock_layout.addWidget(expiring)
-        low_stock_layout.addStretch()
-        
-        self.low_stock.layout.addLayout(low_stock_layout)
-        
-        # Stock movement card
-        stock_movement = DetailCard("📊 Stock Movement")
-        stock_layout = QVBoxLayout()
-        stock_layout.setSpacing(12)
-        
-        incoming = QLabel("Incoming ↗ Soon")
-        incoming.setStyleSheet("color: #3366CC; font-weight: bold; background-color: transparent;")
-        incoming.setFont(QFont(ThemeManager.FONTS["family"], 14))
-        
-        turnover = QLabel("Stock Turnover +15%")
-        turnover.setStyleSheet("color: #33AA33; background-color: transparent;")
-        turnover.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        stock_layout.addWidget(incoming)
-        stock_layout.addWidget(turnover)
-        stock_layout.addStretch()
-        
-        stock_movement.layout.addLayout(stock_layout)
-        
-        inventory_grid.addWidget(self.inventory_overview, 0, 0)
-        inventory_grid.addWidget(self.low_stock, 0, 1)
-        inventory_grid.addWidget(stock_movement, 0, 2)
-        
-        main_layout.addLayout(inventory_grid)
-        
-        # Financial Reports Section
-        financial_header = SectionHeader("FINANCIAL REPORTS", "💹")
-        financial_header.print_btn.clicked.connect(self.generate_financial_report)
-        main_layout.addWidget(financial_header)
-        
-        financial_grid = QGridLayout()
-        financial_grid.setHorizontalSpacing(20)
-        
-        # Configure column stretching
-        financial_grid.setColumnStretch(0, 1)
-        financial_grid.setColumnStretch(1, 1)
-        financial_grid.setColumnStretch(2, 1)
-        
-        # Expenses overview card
-        self.expenses_overview = DetailCard("📉 Expenses Overview")
-        expenses_layout = QVBoxLayout()
-        expenses_layout.setSpacing(12)
-        
-        self.total_expenses_label = QLabel("Total Exp: $0")
-        self.total_expenses_label.setStyleSheet("color: #FF3333; font-weight: bold; background-color: transparent;")
-        self.total_expenses_label.setFont(QFont(ThemeManager.FONTS["family"], 14))
-        
-        operational = QLabel("Operational: $10K")
-        operational.setStyleSheet("color: #333333; background-color: transparent;")
-        operational.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        marketing = QLabel("Marketing: $5K")
-        marketing.setStyleSheet("color: #333333; background-color: transparent;")
-        marketing.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        expenses_layout.addWidget(self.total_expenses_label)
-        expenses_layout.addWidget(operational)
-        expenses_layout.addWidget(marketing)
-        expenses_layout.addStretch()
-        
-        self.expenses_overview.layout.addLayout(expenses_layout)
-        
-        # Profit/Loss card
-        self.profit_loss = DetailCard("📊 Profit/Loss Report")
-        profit_layout = QVBoxLayout()
-        profit_layout.setSpacing(12)
-        
-        self.profit_margin_label = QLabel("Profit Margin: 0%")
-        self.profit_margin_label.setStyleSheet("color: #33AA33; font-weight: bold; background-color: transparent;")
-        self.profit_margin_label.setFont(QFont(ThemeManager.FONTS["family"], 14))
-        
-        profit_category = QLabel("Profit by Category")
-        profit_category.setStyleSheet("color: #333333; background-color: transparent;")
-        profit_category.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        profit_layout.addWidget(self.profit_margin_label)
-        profit_layout.addWidget(profit_category)
-        profit_layout.addStretch()
-        
-        self.profit_loss.layout.addLayout(profit_layout)
-        
-        # Sales vs Expenses card
-        sales_vs_expenses = DetailCard("📊 Sales vs Expenses")
-        sales_exp_layout = QVBoxLayout()
-        sales_exp_layout.setSpacing(12)
-        
-        monthly = QLabel("Monthly Breakdown")
-        monthly.setStyleSheet("color: #333333; font-weight: bold; background-color: transparent;")
-        monthly.setFont(QFont(ThemeManager.FONTS["family"], 14))
-        
-        trend = QLabel("Trend Analysis")
-        trend.setStyleSheet("color: #333333; background-color: transparent;")
-        trend.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        breakeven = QLabel("Break-even Point...")
-        breakeven.setStyleSheet("color: #333333; background-color: transparent;")
-        breakeven.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        sales_exp_layout.addWidget(monthly)
-        sales_exp_layout.addWidget(trend)
-        sales_exp_layout.addWidget(breakeven)
-        sales_exp_layout.addStretch()
-        
-        sales_vs_expenses.layout.addLayout(sales_exp_layout)
-        
-        financial_grid.addWidget(self.expenses_overview, 0, 0)
-        financial_grid.addWidget(self.profit_loss, 0, 1)
-        financial_grid.addWidget(sales_vs_expenses, 0, 2)
-        
-        main_layout.addLayout(financial_grid)
-        
-        # Customer Reports Section
-        customer_header = SectionHeader("CUSTOMER REPORTS", "👥")
-        customer_header.print_btn.clicked.connect(self.generate_customer_report)
-        main_layout.addWidget(customer_header)
-        
-        customer_grid = QGridLayout()
-        customer_grid.setHorizontalSpacing(20)
-        
-        # Configure column stretching
-        customer_grid.setColumnStretch(0, 1)
-        customer_grid.setColumnStretch(1, 1)
-        
-        # Customer insights card
-        customer_insights = DetailCard("👥 Customer Insights")
-        customer_layout = QVBoxLayout()
-        customer_layout.setSpacing(12)
-        
-        top_customers = QLabel("Top Customers: 10")
-        top_customers.setStyleSheet("color: #3366CC; font-weight: bold; background-color: transparent;")
-        top_customers.setFont(QFont(ThemeManager.FONTS["family"], 14))
-        
-        loyalty = QLabel("Loyalty Score: 85%")
-        loyalty.setStyleSheet("color: #33AA33; background-color: transparent;")
-        loyalty.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        retention = QLabel("Retention: High")
-        retention.setStyleSheet("color: #333333; background-color: transparent;")
-        retention.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        customer_layout.addWidget(top_customers)
-        customer_layout.addWidget(loyalty)
-        customer_layout.addWidget(retention)
-        customer_layout.addStretch()
-        
-        customer_insights.layout.addLayout(customer_layout)
-        
-        # Outstanding payments card
-        outstanding_payments = DetailCard("💵 Outstanding Payments")
-        payments_layout = QVBoxLayout()
-        payments_layout.setSpacing(12)
-        
-        pending = QLabel("Pending: 💵 $5K")
-        pending.setStyleSheet("color: #FF9900; font-weight: bold; background-color: transparent;")
-        pending.setFont(QFont(ThemeManager.FONTS["family"], 14))
-        
-        due_soon = QLabel("Due Soon: ⏰ 3 invoices")
-        due_soon.setStyleSheet("color: #FF3333; background-color: transparent;")
-        due_soon.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        late = QLabel("Late Payments: Trend ↘")
-        late.setStyleSheet("color: #333333; background-color: transparent;")
-        late.setFont(QFont(ThemeManager.FONTS["family"], 13))
-        
-        payments_layout.addWidget(pending)
-        payments_layout.addWidget(due_soon)
-        payments_layout.addWidget(late)
-        payments_layout.addStretch()
-        
-        outstanding_payments.layout.addLayout(payments_layout)
-        
-        customer_grid.addWidget(customer_insights, 0, 0)
-        customer_grid.addWidget(outstanding_payments, 0, 1)
-        
-        main_layout.addLayout(customer_grid)
-        
-        scroll_area.setWidget(scroll_content)
-        
-        # Set the scroll area as this widget's main layout
-        outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(0, 0, 0, 0)
-        outer_layout.addWidget(scroll_area)
+        self.period_combo.addItems(["This Month", "Last Month", "This Year"])
+        controls_row.addWidget(self.period_combo)
+        self.export_excel_btn = Button("Export Excel", variant="secondary")
+        controls_row.addWidget(self.export_excel_btn)
+        self.export_pdf_btn = Button("Export PDF", variant="secondary")
+        controls_row.addWidget(self.export_pdf_btn)
+        self.print_btn = Button("Print", variant="secondary")
+        controls_row.addWidget(self.print_btn)
+        main_layout.addLayout(controls_row)
+
+        # Tabs
+        self.tabs = TabsLayout()
+        # Set active tab label color to black
+        self.tabs.setStyleSheet('''
+            QTabBar::tab:selected { color: #111; font-weight: bold; }
+            QTabBar::tab:!selected { color: #bbb; }
+        ''')
+        self.tabs.add_tab("Summary", self._summary_tab())
+        self.tabs.add_tab("Sales", self._sales_tab())
+        self.tabs.add_tab("Inventory", self._inventory_tab())
+        self.tabs.add_tab("Customers", self._customers_tab())
+        main_layout.addWidget(self.tabs)
     
     def connect_signals(self):
         """Connect widget signals to handlers"""
         self.period_combo.currentIndexChanged.connect(self.load_data)
-        self.refresh_btn.clicked.connect(self.refresh_data)
+        self.export_pdf_btn.clicked.connect(self.export_pdf_report)
+        self.export_excel_btn.clicked.connect(self.export_excel_report)
+        self.print_btn.clicked.connect(self.print_report)
     
     def get_selected_period(self):
         """Convert the UI period selection to controller period string"""
@@ -539,13 +180,19 @@ class ReportsView(QWidget):
         """Load data from controller and update UI"""
         try:
             period = self.get_selected_period()
-            
-            # Get sales data
             sales_data = self.controller.get_sales_summary(period)
-            self.sales_card.update_value(f"${sales_data.get('total_sales', 0):,.2f}")
-            self.total_sales_label.setText(f"Total Sales: ${sales_data.get('total_sales', 0):,.2f}")
-            self.avg_order_label.setText(f"Avg Order: ${sales_data.get('average_order', 0):,.2f}")
-            self.orders_label.setText(f"Total Orders: {sales_data.get('total_orders', 0):,}")
+            self.revenue_card.update_values(f"${sales_data.get('total_sales', 0):,.2f}")
+            self.orders_card.update_values(f"{sales_data.get('total_orders', 0):,}")
+            self.avg_card.update_values(f"${sales_data.get('average_order', 0):,.2f}")
+            # TODO: Set self.revenue_sub, self.orders_sub, self.avg_sub with real period-over-period change if available
+            # Update charts with real data
+            months, revenue_data = self.controller.get_monthly_sales()
+            self.revenue_chart.set_data(revenue_data, labels=months, chart_type='line', color='#2563eb')
+            cat_labels, cat_data = self.controller.get_sales_by_category()
+            self.pie_chart.set_data(cat_data, labels=cat_labels, chart_type='bar', color='#6366f1')
+            # Customer growth chart
+            cust_labels, cust_data = self.controller.get_customer_growth()
+            self.growth_chart.set_data(cust_data, labels=cust_labels, chart_type='line', color='#3B82F6')
             
             # Get inventory data
             inventory_data = self.controller.get_inventory_value()
@@ -669,3 +316,385 @@ class ReportsView(QWidget):
             "- Customer loyalty metrics\n"
             "- Outstanding customer balances"
         )
+
+    def _summary_tab(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setSpacing(20)
+        cards_row = QHBoxLayout()
+        cards_row.setSpacing(20)
+        # Card 1: Total Revenue
+        self.revenue_card = CardWidget("Total Revenue", "$0.00", icon="💰")
+        cards_row.addWidget(self.revenue_card)
+        # Card 2: Total Orders
+        self.orders_card = CardWidget("Total Orders", "0", icon="📦")
+        cards_row.addWidget(self.orders_card)
+        # Card 3: Avg Order Value
+        self.avg_card = CardWidget("Avg Order Value", "$0.00", icon="💵")
+        cards_row.addWidget(self.avg_card)
+        # Card 4: Active Customers
+        self.cust_card = CardWidget("Active Customers", "0", icon="👥")
+        cards_row.addWidget(self.cust_card)
+        layout.addLayout(cards_row)
+        # Charts row
+        charts_row = QHBoxLayout()
+        charts_row.setSpacing(20)
+        self.revenue_trend = Card("Revenue Trend", parent=widget)
+        self.revenue_trend.layout.setContentsMargins(16, 16, 16, 16)
+        self.revenue_chart = ChartWidget()
+        self.revenue_trend.layout.addWidget(self.revenue_chart)
+        charts_row.addWidget(self.revenue_trend)
+        self.sales_by_cat = Card("Sales by Category", parent=widget)
+        self.sales_by_cat.layout.setContentsMargins(16, 16, 16, 16)
+        self.pie_chart = ChartWidget()
+        self.sales_by_cat.layout.addWidget(self.pie_chart)
+        charts_row.addWidget(self.sales_by_cat)
+        layout.addLayout(charts_row)
+        return widget
+
+    def _sales_tab(self):
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setSpacing(24)
+        # Left: Sales Overview card
+        left_card = QFrame()
+        left_card.setStyleSheet("background: #fff; border: none; border-radius: 14px;")
+        left_layout = QVBoxLayout(left_card)
+        left_layout.setContentsMargins(28, 20, 28, 20)
+        left_layout.setSpacing(8)
+        title = QLabel("Sales Overview")
+        title.setFont(QFont(ThemeManager.FONTS["family"], 22, QFont.Bold))
+        left_layout.addWidget(title)
+        subtitle = QLabel("Revenue and order trends")
+        subtitle.setStyleSheet("color: #6b7280; font-size: 15px;")
+        left_layout.addWidget(subtitle)
+        sales_chart = ChartWidget()
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+        sales_data = [45000, 52000, 48000, 61000, 55000, 67000]
+        sales_chart.set_data(sales_data, labels=months, chart_type='bar', color='#3B82F6')
+        sales_chart.setStyleSheet("background: #fff; border: none; min-height: 260px;")
+        left_layout.addWidget(sales_chart, 1)
+        layout.addWidget(left_card, 2)
+        # Right: Top Performing Products card
+        right_card = QFrame()
+        right_card.setStyleSheet("background: #fff; border: none; border-radius: 14px;")
+        right_layout = QVBoxLayout(right_card)
+        right_layout.setContentsMargins(28, 20, 28, 20)
+        right_layout.setSpacing(8)
+        title2 = QLabel("Top Performing Products")
+        title2.setFont(QFont(ThemeManager.FONTS["family"], 20, QFont.Bold))
+        right_layout.addWidget(title2)
+        subtitle2 = QLabel("Best selling products by revenue")
+        subtitle2.setStyleSheet("color: #6b7280; font-size: 15px;")
+        right_layout.addWidget(subtitle2)
+        # Product list
+        products = [
+            {"name": "iPhone 14 Pro", "units": 145, "revenue": 144855, "growth": 12},
+            {"name": "Samsung Galaxy S23", "units": 98, "revenue": 78392, "growth": -3},
+            {"name": "MacBook Pro 14\"", "units": 56, "revenue": 111944, "growth": 8},
+            {"name": "Nike Air Max 90", "units": 234, "revenue": 28080, "growth": 15},
+            {"name": "AirPods Pro", "units": 189, "revenue": 47025, "growth": 22},
+        ]
+        for prod in products:
+            prod_card = QFrame()
+            prod_card.setStyleSheet("background: #fff; border: none; border-radius: 10px; margin-bottom: 10px;")
+            prod_layout = QHBoxLayout(prod_card)
+            prod_layout.setContentsMargins(16, 10, 16, 10)
+            prod_layout.setSpacing(8)
+            # Left: Name and units
+            name_units = QVBoxLayout()
+            name = QLabel(f"<b>{prod['name']}</b>")
+            name.setFont(QFont(ThemeManager.FONTS["family"], 14, QFont.Bold))
+            units = QLabel(f"{prod['units']} units sold")
+            units.setStyleSheet("color: #6b7280; font-size: 13px;")
+            name_units.addWidget(name)
+            name_units.addWidget(units)
+            prod_layout.addLayout(name_units, 2)
+            # Right: Revenue and growth
+            rev_growth = QVBoxLayout()
+            revenue = QLabel(f"<b>${prod['revenue']:,}</b>")
+            revenue.setFont(QFont(ThemeManager.FONTS["family"], 14, QFont.Bold))
+            revenue.setAlignment(Qt.AlignRight)
+            growth = QLabel()
+            if prod['growth'] >= 0:
+                growth.setText(f"<span style='color:#16a34a;'>&#8593; {prod['growth']}%</span>")
+            else:
+                growth.setText(f"<span style='color:#dc2626;'>&#8595; {abs(prod['growth'])}%</span>")
+            growth.setStyleSheet("font-size: 13px;")
+            growth.setAlignment(Qt.AlignRight)
+            rev_growth.addWidget(revenue)
+            rev_growth.addWidget(growth)
+            prod_layout.addLayout(rev_growth, 1)
+            right_layout.addWidget(prod_card)
+        right_layout.addStretch(1)
+        layout.addWidget(right_card, 2)
+        return widget
+
+    def _inventory_tab(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setSpacing(28)
+        # Section header
+        header = QLabel("Inventory Status by Category")
+        header.setFont(QFont(ThemeManager.FONTS["family"], 20, QFont.Bold))
+        layout.addWidget(header)
+        subtitle = QLabel("Current stock levels and alerts")
+        subtitle.setStyleSheet("color: #888; font-size: 15px;")
+        layout.addWidget(subtitle)
+        # Fetch real inventory data by category
+        try:
+            if hasattr(self.controller, 'get_inventory_by_category'):
+                categories = self.controller.get_inventory_by_category()
+            else:
+                # Fallback: use overall inventory value as a single category
+                inv = self.controller.get_inventory_value()
+                categories = [{
+                    "name": "All Categories",
+                    "value": f"${inv.get('total_value', 0):,.2f}",
+                    "low": inv.get('low_stock_items', 0),
+                    "out": 0,  # Not available
+                    "in": inv.get('total_items', 0) - inv.get('low_stock_items', 0),
+                    "count": inv.get('total_items', 0)
+                }]
+        except Exception as e:
+            logger.error(f"Error loading inventory by category: {str(e)}")
+            categories = []
+        for cat in categories:
+            card = QFrame()
+            card.setFrameShape(QFrame.StyledPanel)
+            card.setStyleSheet("background: #fff; border-radius: 14px; border: none; margin-bottom: 8px;")
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(18, 12, 18, 12)
+            card_layout.setSpacing(8)
+            # First row: category name (left), item count (right, pill)
+            row1 = QHBoxLayout()
+            row1.setContentsMargins(0, 0, 0, 0)
+            row1.setSpacing(0)
+            name = QLabel(f"<b>{cat['name']}</b>")
+            name.setFont(QFont(ThemeManager.FONTS["family"], 15, QFont.Bold))
+            name.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+            row1.addWidget(name, 1)
+            row1.addStretch(10)
+            count = QLabel(f"<span style='font-size:13px; color:#222; background:#f3f4f6; border-radius:16px; padding:7px 18px;'><b>{cat['count']} items</b></span>")
+            count.setTextFormat(Qt.RichText)
+            count.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+            row1.addWidget(count, 0)
+            card_layout.addLayout(row1)
+            # Second row: metrics (use QLabel with HTML, no QWidget nesting)
+            row2 = QHBoxLayout()
+            row2.setContentsMargins(0, 0, 0, 0)
+            row2.setSpacing(0)
+            def metric(label, value, color=None, minw=120):
+                style = f"font-size:11px; color:#888;" if not color else f"font-size:11px; color:#888;"
+                val_style = f"font-size:15px; font-weight:bold; color:{color if color else '#222'}; margin-top:2px;"
+                html = f"""
+                <div style='min-width:{minw}px; text-align:left;'>
+                  <div style='{style}'>{label}</div>
+                  <div style='{val_style}'>{value}</div>
+                </div>
+                """
+                lbl = QLabel(html)
+                lbl.setTextFormat(Qt.RichText)
+                lbl.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                return lbl
+            row2.addWidget(metric("Total Value", cat['value']), 2)
+            row2.addWidget(metric("Low Stock", cat['low'], "#ea580c"), 1)
+            row2.addWidget(metric("Out of Stock", cat['out'], "#dc2626"), 1)
+            row2.addWidget(metric("In Stock", cat['in'], "#16a34a"), 1)
+            card_layout.addLayout(row2)
+            layout.addWidget(card)
+        layout.addStretch()
+        return widget
+
+    def _customers_tab(self):
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setSpacing(24)
+        # Left: Customer Growth chart in a card
+        left_card = QFrame()
+        left_card.setStyleSheet("background: #fff; border: none; border-radius: 12px;")
+        left_layout = QVBoxLayout(left_card)
+        left_layout.setContentsMargins(24, 16, 24, 16)
+        left_layout.setSpacing(4)
+        title = QLabel("Customer Growth")
+        title.setFont(QFont(ThemeManager.FONTS["family"], 18, QFont.Bold))
+        title.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
+        left_layout.addWidget(title)
+        subtitle = QLabel("New customers acquired over time")
+        subtitle.setStyleSheet("color: #6b7280; font-size: 14px; margin-bottom: 0px;")
+        subtitle.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
+        left_layout.addWidget(subtitle)
+        self.growth_chart = ChartWidget()
+        self.growth_chart.setStyleSheet("background: #fff; border: none; min-height: 220px;")
+        left_layout.addWidget(self.growth_chart, 1)
+        layout.addWidget(left_card, 2)
+        # Right: Customer Metrics card
+        right_card = QFrame()
+        right_card.setStyleSheet("background: #fff; border: none; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);")
+        right_layout = QVBoxLayout(right_card)
+        right_layout.setContentsMargins(32, 24, 32, 24)
+        right_layout.setSpacing(10)
+        title2 = QLabel("Customer Metrics")
+        title2.setFont(QFont(ThemeManager.FONTS["family"], 18, QFont.Bold))
+        right_layout.addWidget(title2)
+        subtitle2 = QLabel("Key customer performance indicators")
+        subtitle2.setStyleSheet("color: #6b7280; font-size: 14px; margin-bottom: 0px;")
+        right_layout.addWidget(subtitle2)
+        # 2x2 grid of metric cards, compact and centered
+        grid = QGridLayout()
+        grid.setSpacing(16)
+        grid.setContentsMargins(0, 12, 0, 0)
+        for i, (title, value) in enumerate([
+            ("Total Customers", "573"),
+            ("Customer Retention", "89%"),
+            ("Avg Customer Value", "$432"),
+            ("Avg Orders per Customer", "4.2")]):
+            card = CardWidget(title, value)
+            card.setStyleSheet("background: #fff; border: none; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.03); min-width: 160px; min-height: 80px; font-size: 15px;")
+            grid.addWidget(card, i // 2, i % 2)
+        right_layout.addStretch(1)
+        right_layout.addLayout(grid)
+        right_layout.addStretch(1)
+        layout.addWidget(right_card, 2)
+        return widget
+
+    def generate_ai_summary(self):
+        """Generate a business summary using a free AI model (HuggingFace Transformers)"""
+        try:
+            from transformers import pipeline
+            # Prepare a prompt with current data
+            prompt = (
+                f"Business Report Summary:\n"
+                f"Total Revenue: {self.revenue_card.value_label.text()}\n"
+                f"Total Orders: {self.orders_card.value_label.text()}\n"
+                f"Avg Order Value: {self.avg_card.value_label.text()}\n"
+                f"Active Customers: {self.cust_card.value_label.text()}\n"
+                f"Stock Value: {self.stock_value_label.text()}\n"
+                f"Low Stock Items: {self.low_stock_label.text()}\n"
+                f"Total Items: {self.total_items_label.text()}\n"
+                f"Customer Retention: 89%\n"
+                f"Avg Customer Value: $432\n"
+                f"Avg Orders per Customer: 4.2\n"
+                f"Write a concise, insightful summary of the business performance for this period."
+            )
+            summarizer = pipeline('text-generation', model='distilgpt2')
+            summary = summarizer(prompt, max_length=120, do_sample=True)[0]['generated_text']
+            # Only return the generated part after the prompt
+            return summary[len(prompt):].strip()
+        except ImportError:
+            return "[Install 'transformers' to enable AI-generated summaries.]"
+        except Exception as e:
+            return f"[AI summary error: {str(e)}]"
+
+    def export_pdf_report(self):
+        """Export a business report as PDF for the selected period using ReportLab"""
+        try:
+            from reportlab.lib.pagesizes import letter
+            from reportlab.pdfgen import canvas
+            period = self.get_selected_period()
+            file_path, _ = QFileDialog.getSaveFileName(self, "Save PDF Report", "business_report.pdf", "PDF Files (*.pdf)")
+            if not file_path:
+                return
+            c = canvas.Canvas(file_path, pagesize=letter)
+            width, height = letter
+            c.setFont("Helvetica-Bold", 18)
+            c.drawString(40, height - 50, "Business Report")
+            c.setFont("Helvetica", 12)
+            c.drawString(40, height - 80, f"Period: {self.period_combo.currentText()}")
+            y = height - 120
+            # AI summary
+            ai_summary = self.generate_ai_summary()
+            c.setFont("Helvetica-Oblique", 11)
+            c.drawString(40, y, "AI Business Summary:")
+            y -= 18
+            for line in ai_summary.split('\n'):
+                c.drawString(60, y, line)
+                y -= 15
+            y -= 10
+            # Summary
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(40, y, "Summary")
+            y -= 20
+            c.setFont("Helvetica", 12)
+            c.drawString(60, y, f"Total Revenue: {self.revenue_card.value_label.text()}")
+            y -= 18
+            c.drawString(60, y, f"Total Orders: {self.orders_card.value_label.text()}")
+            y -= 18
+            c.drawString(60, y, f"Avg Order Value: {self.avg_card.value_label.text()}")
+            y -= 18
+            c.drawString(60, y, f"Active Customers: {self.cust_card.value_label.text()}")
+            y -= 30
+            # Sales
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(40, y, "Sales Overview")
+            y -= 20
+            c.setFont("Helvetica", 12)
+            c.drawString(60, y, "(See app for chart)")
+            y -= 30
+            # Inventory
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(40, y, "Inventory")
+            y -= 20
+            c.setFont("Helvetica", 12)
+            c.drawString(60, y, self.stock_value_label.text())
+            y -= 18
+            c.drawString(60, y, self.total_items_label.text())
+            y -= 18
+            c.drawString(60, y, self.low_stock_label.text())
+            y -= 30
+            # Customers
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(40, y, "Customers")
+            y -= 20
+            c.setFont("Helvetica", 12)
+            c.drawString(60, y, f"Total Customers: 573")
+            y -= 18
+            c.drawString(60, y, f"Customer Retention: 89%")
+            y -= 18
+            c.drawString(60, y, f"Avg Customer Value: $432")
+            y -= 18
+            c.drawString(60, y, f"Avg Orders per Customer: 4.2")
+            c.save()
+            QMessageBox.information(self, "Export PDF", f"PDF report exported successfully to:\n{file_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Export PDF Error", f"Failed to export PDF: {str(e)}")
+
+    def export_excel_report(self):
+        """Export a business report as Excel for the selected period using pandas"""
+        try:
+            import pandas as pd
+            period = self.get_selected_period()
+            file_path, _ = QFileDialog.getSaveFileName(self, "Save Excel Report", "business_report.xlsx", "Excel Files (*.xlsx)")
+            if not file_path:
+                return
+            # Prepare data
+            data = {
+                'Metric': ['Total Revenue', 'Total Orders', 'Avg Order Value', 'Active Customers'],
+                'Value': [self.revenue_card.value_label.text(), self.orders_card.value_label.text(), self.avg_card.value_label.text(), self.cust_card.value_label.text()]
+            }
+            df = pd.DataFrame(data)
+            # Add AI summary as a new sheet
+            with pd.ExcelWriter(file_path) as writer:
+                df.to_excel(writer, index=False, sheet_name='Summary')
+                summary_df = pd.DataFrame({'AI Business Summary': [self.generate_ai_summary()]})
+                summary_df.to_excel(writer, index=False, sheet_name='AI Summary')
+            QMessageBox.information(self, "Export Excel", f"Excel report exported successfully to:\n{file_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Excel Error", f"Failed to export Excel: {str(e)}")
+
+    def print_report(self):
+        """Print the business report using QPrinter"""
+        try:
+            from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
+            printer = QPrinter(QPrinter.HighResolution)
+            dialog = QPrintDialog(printer, self)
+            if dialog.exec_() == QPrintDialog.Accepted:
+                # Print the current widget (the report page)
+                # Print AI summary first
+                ai_summary = self.generate_ai_summary()
+                # For simplicity, show the summary in a message box before printing
+                QMessageBox.information(self, "AI Business Summary", ai_summary)
+                self.render(printer)
+                QMessageBox.information(self, "Print", "Report sent to printer.")
+        except Exception as e:
+            QMessageBox.critical(self, "Print Error", f"Failed to print report: {str(e)}")

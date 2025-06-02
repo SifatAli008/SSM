@@ -6,193 +6,91 @@ from app.utils.logger import logger
 from app.utils.database import DatabaseManager
 from app.core.event_system import EventSystem, EventTypes
 from app.models.base import Sale, SaleCreate, SaleUpdate, SaleItem, SaleItemCreate, Product
+from app.ui.firebase_utils import get_db
+import random
 
 class SalesManager:
     def __init__(self, event_system: EventSystem):
         self.event_system = event_system
+        self.db = get_db().child('sales')
     
     def create_sale(self, sale_data: SaleCreate) -> Optional[Sale]:
-        """Create a new sale transaction."""
+        """Create a new sale transaction in Firebase."""
         try:
-            with DatabaseManager().get_session() as session:
-                # Create sale
-                sale = Sale(
-                    user_id=sale_data.user_id,
-                    total_amount=sale_data.total_amount,
-                    payment_method=sale_data.payment_method,
-                    status=sale_data.status
-                )
-                session.add(sale)
-                session.flush()  # Get sale ID
-                
-                # Create sale items
-                for item_data in sale_data.items:
-                    product = session.query(Product).filter(Product.id == item_data['product_id']).first()
-                    if not product:
-                        raise ValueError(f"Product not found: {item_data['product_id']}")
-                    
-                    # Check stock
-                    if product.stock < item_data['quantity']:
-                        raise ValueError(f"Insufficient stock for product: {product.name}")
-                    
-                    # Create sale item
-                    sale_item = SaleItem(
-                        sale_id=sale.id,
-                        product_id=item_data['product_id'],
-                        quantity=item_data['quantity'],
-                        price=item_data['price']
-                    )
-                    session.add(sale_item)
-                    
-                    # Update stock
-                    product.stock -= item_data['quantity']
-                
-                session.commit()
-                session.refresh(sale)
-                
-                # Publish event
-                self.event_system.publish(EventTypes.SALE_CREATED, {
-                    'sale_id': sale.id,
-                    'user_id': sale.user_id,
-                    'total_amount': float(sale.total_amount),
-                    'items_count': len(sale_data.items)
-                })
-                
-                logger.info(f"Sale created: {sale.id}")
-                return sale
+            sale_id = f"sale_{random.randint(1000,9999)}_{int(datetime.now().timestamp())}"
+            sale = sale_data.dict() if hasattr(sale_data, 'dict') else dict(sale_data)
+            self.db.child(sale_id).set(sale)
+            return sale_id
         except Exception as e:
-            logger.error(f"Failed to create sale: {e}")
+            print(f"Failed to create sale: {e}")
             return None
     
-    def update_sale(self, sale_id: int, sale_data: SaleUpdate) -> Optional[Sale]:
-        """Update sale information."""
+    def update_sale(self, sale_id: int, sale_data: SaleUpdate) -> bool:
+        """Update sale information in Firebase."""
         try:
-            with DatabaseManager().get_session() as session:
-                sale = session.query(Sale).filter(Sale.id == sale_id).first()
-                if not sale:
-                    return None
-                
-                # Update sale fields
-                for field, value in sale_data.dict(exclude_unset=True).items():
-                    setattr(sale, field, value)
-                
-                session.commit()
-                session.refresh(sale)
-                
-                # Publish event
-                self.event_system.publish(EventTypes.SALE_UPDATED, {
-                    'sale_id': sale.id,
-                    'user_id': sale.user_id,
-                    'total_amount': float(sale.total_amount),
-                    'status': sale.status
-                })
-                
-                logger.info(f"Sale updated: {sale.id}")
-                return sale
+            sale = sale_data.dict() if hasattr(sale_data, 'dict') else dict(sale_data)
+            self.db.child(sale_id).update(sale)
+            return True
         except Exception as e:
-            logger.error(f"Failed to update sale: {e}")
-            return None
+            print(f"Failed to update sale: {e}")
+            return False
     
     def delete_sale(self, sale_id: int) -> bool:
-        """Delete a sale and restore stock."""
+        """Delete a sale from Firebase."""
         try:
-            with DatabaseManager().get_session() as session:
-                sale = session.query(Sale).filter(Sale.id == sale_id).first()
-                if not sale:
-                    return False
-                
-                # Restore stock for each item
-                for item in sale.items:
-                    product = session.query(Product).filter(Product.id == item.product_id).first()
-                    if product:
-                        product.stock += item.quantity
-                
-                # Publish event before deletion
-                self.event_system.publish(EventTypes.SALE_DELETED, {
-                    'sale_id': sale.id,
-                    'user_id': sale.user_id,
-                    'total_amount': float(sale.total_amount)
-                })
-                
-                session.delete(sale)
-                session.commit()
-                
-                logger.info(f"Sale deleted: {sale_id}")
-                return True
+            self.db.child(sale_id).delete()
+            return True
         except Exception as e:
-            logger.error(f"Failed to delete sale: {e}")
+            print(f"Failed to delete sale: {e}")
             return False
     
     def get_sale(self, sale_id: int) -> Optional[Sale]:
-        """Get sale by ID."""
-        with DatabaseManager().get_session() as session:
-            return session.query(Sale).filter(Sale.id == sale_id).first()
+        """Get sale by ID from Firebase."""
+        try:
+            data = self.db.child(sale_id).get().val()
+            if data:
+                return Sale(**data)
+            return None
+        except Exception as e:
+            print(f"Failed to get sale: {e}")
+            return None
     
-    def list_sales(self, user_id: Optional[int] = None, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> List[Sale]:
-        """List sales with optional filters."""
-        with DatabaseManager().get_session() as session:
-            query = session.query(Sale)
-            
-            if user_id:
-                query = query.filter(Sale.user_id == user_id)
-            if start_date:
-                query = query.filter(Sale.created_at >= start_date)
-            if end_date:
-                query = query.filter(Sale.created_at <= end_date)
-            
-            return query.order_by(Sale.created_at.desc()).all()
+    def list_sales(self, customer_id: Optional[int] = None) -> List[Sale]:
+        """List all sales, optionally filtered by customer_id, from Firebase."""
+        try:
+            all_data = self.db.get().val() or {}
+            sales = [Sale(**v) for v in all_data.values()]
+            if customer_id:
+                sales = [s for s in sales if s.customer_id == customer_id]
+            return sales
+        except Exception as e:
+            print(f"Failed to list sales: {e}")
+            return []
     
     def get_sale_items(self, sale_id: int) -> List[SaleItem]:
         """Get items for a sale."""
         with DatabaseManager().get_session() as session:
             return session.query(SaleItem).filter(SaleItem.sale_id == sale_id).all()
     
-    def get_sales_summary(self, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
-        """Get sales summary for a date range."""
+    def get_sales_summary(self) -> Dict[str, Any]:
+        """Get sales summary from Firebase."""
         try:
-            with DatabaseManager().get_session() as session:
-                # Get total sales
-                total_sales = session.query(Sale).filter(
-                    Sale.created_at.between(start_date, end_date)
-                ).count()
-                
-                # Get total revenue
-                total_revenue = session.query(Sale).filter(
-                    Sale.created_at.between(start_date, end_date)
-                ).with_entities(func.sum(Sale.total_amount)).scalar() or Decimal('0')
-                
-                # Get average sale amount
-                avg_sale = total_revenue / total_sales if total_sales > 0 else Decimal('0')
-                
-                # Get top selling products
-                top_products = session.query(
-                    Product.name,
-                    func.sum(SaleItem.quantity).label('total_quantity'),
-                    func.sum(SaleItem.quantity * SaleItem.price).label('total_revenue')
-                ).join(SaleItem).join(Sale).filter(
-                    Sale.created_at.between(start_date, end_date)
-                ).group_by(Product.id).order_by(desc('total_quantity')).limit(5).all()
-                
-                return {
-                    'total_sales': total_sales,
-                    'total_revenue': float(total_revenue),
-                    'average_sale': float(avg_sale),
-                    'top_products': [
-                        {
-                            'name': p.name,
-                            'quantity': p.total_quantity,
-                            'revenue': float(p.total_revenue)
-                        }
-                        for p in top_products
-                    ]
-                }
+            all_data = self.db.get().val() or {}
+            sales = [Sale(**v) for v in all_data.values()]
+            total_sales = len(sales)
+            total_revenue = sum(s.total_price for s in sales)
+            avg_sale = total_revenue / total_sales if total_sales > 0 else 0.0
+            return {
+                'total_sales': total_sales,
+                'total_revenue': total_revenue,
+                'average_sale': avg_sale
+            }
         except Exception as e:
-            logger.error(f"Failed to get sales summary: {e}")
+            print(f"Failed to get sales summary: {e}")
             return {
                 'total_sales': 0,
                 'total_revenue': 0.0,
-                'average_sale': 0.0,
-                'top_products': []
+                'average_sale': 0.0
             }
     
     def get_daily_sales(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:

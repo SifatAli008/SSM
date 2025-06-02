@@ -310,3 +310,88 @@ class ReportsController:
         except Exception as e:
             logger.error(f"Error generating inventory report: {str(e)}")
             return None
+
+    def get_monthly_sales(self, months=6):
+        """Return sales totals for the last N months as (labels, values)"""
+        try:
+            now = datetime.now()
+            labels = []
+            values = []
+            for i in range(months-1, -1, -1):
+                month = (now.replace(day=1) - timedelta(days=30*i)).strftime('%b')
+                labels.append(month)
+                start = (now.replace(day=1) - timedelta(days=30*i)).replace(day=1)
+                end = (start + timedelta(days=32)).replace(day=1) - timedelta(seconds=1)
+                query = """
+                    SELECT SUM(total_amount) FROM sales WHERE sale_date BETWEEN ? AND ?
+                """
+                result = self.db.execute_query(query, (start.strftime('%Y-%m-%d %H:%M:%S'), end.strftime('%Y-%m-%d %H:%M:%S')))
+                values.append(float(result[0][0]) if result and result[0][0] else 0)
+            return labels[::-1], values[::-1]
+        except Exception as e:
+            logger.error(f"Error getting monthly sales: {str(e)}")
+            return ["Jan", "Feb", "Mar", "Apr", "May", "Jun"], [0,0,0,0,0,0]
+
+    def get_sales_by_category(self):
+        """Return sales by category as (labels, values)"""
+        try:
+            query = """
+                SELECT category, SUM(total_amount) FROM sales GROUP BY category
+            """
+            result = self.db.execute_query(query)
+            labels = [row[0] for row in result]
+            values = [float(row[1]) for row in result]
+            return labels, values
+        except Exception as e:
+            logger.error(f"Error getting sales by category: {str(e)}")
+            return ["Electronics", "Clothing", "Food & Beverages", "Books"], [10, 20, 30, 40]
+
+    def get_customer_growth(self, months=6):
+        """Return customer count for the last N months as (labels, values)"""
+        try:
+            now = datetime.now()
+            labels = []
+            values = []
+            for i in range(months-1, -1, -1):
+                month = (now.replace(day=1) - timedelta(days=30*i)).strftime('%b')
+                labels.append(month)
+                start = (now.replace(day=1) - timedelta(days=30*i)).replace(day=1)
+                end = (start + timedelta(days=32)).replace(day=1) - timedelta(seconds=1)
+                query = """
+                    SELECT COUNT(*) FROM customers WHERE created_at BETWEEN ? AND ?
+                """
+                result = self.db.execute_query(query, (start.strftime('%Y-%m-%d %H:%M:%S'), end.strftime('%Y-%m-%d %H:%M:%S')))
+                values.append(int(result[0][0]) if result and result[0][0] else 0)
+            return labels[::-1], values[::-1]
+        except Exception as e:
+            logger.error(f"Error getting customer growth: {str(e)}")
+            return ["Jan", "Feb", "Mar", "Apr", "May", "Jun"], [0,0,0,0,0,0]
+
+    def get_inventory_by_category(self):
+        """Return inventory stats per category: name, value, low, out, in, count"""
+        try:
+            query = """
+                SELECT category,
+                       SUM(stock * buying_price) as total_value,
+                       SUM(CASE WHEN stock < 5 AND stock > 0 THEN 1 ELSE 0 END) as low_stock,
+                       SUM(CASE WHEN stock = 0 THEN 1 ELSE 0 END) as out_stock,
+                       SUM(CASE WHEN stock >= 5 THEN 1 ELSE 0 END) as in_stock,
+                       COUNT(*) as item_count
+                FROM inventory
+                GROUP BY category
+            """
+            result = self.db.execute_query(query)
+            categories = []
+            for row in result:
+                categories.append({
+                    "name": row[0],
+                    "value": f"${row[1]:,.2f}",
+                    "low": int(row[2]),
+                    "out": int(row[3]),
+                    "in": int(row[4]),
+                    "count": int(row[5])
+                })
+            return categories
+        except Exception as e:
+            logger.error(f"Error getting inventory by category: {str(e)}")
+            return []

@@ -149,9 +149,17 @@ class ChartWidget(QWidget):
             grad.setColorAt(1, bar_color.darker(120))
             painter.setBrush(QBrush(grad))
             painter.drawRoundedRect(QRectF(x, y, bar_width, bar_height), 6, 6)
-            # Value label (above or below bar, clipped)
-            label_y = y - 22 if y - 22 > margin_top + 2 else y + 22
-            self._draw_value_label(painter, x + bar_width/2, label_y, f'{value:.0f}')
+            # Value label (above bar, always visible)
+            label_y = y - 24 if y - 24 > margin_top + 2 else y + 22
+            # Draw white outline for contrast
+            font = QFont('Segoe UI', 10, QFont.Bold)
+            painter.setFont(font)
+            outline_pen = QPen(QColor('#fff'), 4)
+            painter.setPen(outline_pen)
+            painter.drawText(QRectF(x, label_y, bar_width, 20), Qt.AlignCenter, f'{value:.0f}')
+            # Draw main text
+            painter.setPen(QPen(QColor('#222'), 1))
+            painter.drawText(QRectF(x, label_y, bar_width, 20), Qt.AlignCenter, f'{value:.0f}')
 
     def _draw_value_label(self, painter, x, y, text):
         # Draw white outline for contrast
@@ -166,12 +174,12 @@ class ChartWidget(QWidget):
 
     def _draw_labels(self, painter, margin_left, chart_width, chart_height, margin_top, margin_bottom, data_values):
         painter.setPen(QPen(QColor('#333'), 1))
-        painter.setFont(QFont('Segoe UI', 8, QFont.Bold))
+        painter.setFont(QFont('Segoe UI', 9, QFont.Bold))
         n = len(self.labels)
         # Draw x-axis labels
         for i, label in enumerate(self.labels):
             x = margin_left + (i * chart_width / (n - 1))
-            y = self.height() - margin_bottom + 18
+            y = self.height() - margin_bottom + 24
             painter.drawText(QRectF(x - 30, y, 60, 20), Qt.AlignCenter, str(label))
         # Draw y-axis labels
         for i in range(5):

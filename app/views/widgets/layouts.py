@@ -235,12 +235,13 @@ class TabsLayout(QWidget):
                 border: none;
                 border-bottom: 3px solid transparent;
                 background-color: transparent;
-                font-weight: bold;
+                font-weight: normal;
+                color: #111;
             }
-            
             QPushButton:checked {
                 border-bottom: 3px solid #3498db;
-                color: #3498db;
+                color: #111;
+                font-weight: bold;
             }
         """)
         

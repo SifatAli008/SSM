@@ -27,7 +27,13 @@ from app.controllers.inventory_controller import InventoryController
 from app.utils.database import DatabaseManager
 from app.utils.event_system import global_event_system
 from datetime import datetime, timedelta
-import sqlite3
+
+# Replace all data access with InventoryManager and SalesManager methods
+# Example: inventory_manager = InventoryManager()
+# Use inventory_manager.list_products(), sales_manager.list_sales(), etc. for all dashboard data
+
+from app.core.inventory import InventoryManager
+from app.core.sales import SalesManager
 
 
 
@@ -50,9 +56,8 @@ class DashboardPage(QWidget):
         self.update_recent_activities()
     
     def setup_data_controllers(self):
-        """Initialize controllers for data access"""
-        self.inventory_controller = InventoryController()
-        self.db_connection = DatabaseManager.get_sqlite_connection()
+        self.inventory_manager = InventoryManager(None)
+        self.sales_manager = SalesManager(None)
     
     def setup_event_listeners(self):
         """Set up listeners for the global event system"""
@@ -542,196 +547,67 @@ class DashboardPage(QWidget):
 
     def get_low_stock_count(self):
         """Get count of items with low stock"""
-        if hasattr(self, 'inventory_controller'):
-            return self.inventory_controller.count_low_stock(threshold=10)
+        if hasattr(self, 'inventory_manager'):
+            return self.inventory_manager.count_low_stock(threshold=10)
         return 0
 
     def get_inventory_value(self):
         """Get total inventory value"""
-        if hasattr(self, 'inventory_controller'):
-            return self.inventory_controller.calculate_inventory_value()
+        if hasattr(self, 'inventory_manager'):
+            return self.inventory_manager.calculate_inventory_value()
         return 0
 
     def get_total_revenue(self):
-        """Get total revenue from sales"""
         try:
-            if self.db_connection:
-                cursor = self.db_connection.cursor()
-                
-                # Check if sales table exists with total_price column
-                cursor.execute("""
-                    SELECT name FROM sqlite_master 
-                    WHERE type='table' AND name='sales'
-                """)
-                
-                if cursor.fetchone():
-                    # Get the column names in the sales table
-                    cursor.execute("PRAGMA table_info(sales)")
-                    columns = [row[1] for row in cursor.fetchall()]
-                    
-                    if "total_price" in columns:
-                        # Get revenue from last 30 days
-                        query = """
-                        SELECT SUM(total_price) FROM sales 
-                        WHERE date(sale_date) >= date('now', '-30 days')
-                        """
-                        cursor.execute(query)
-                        result = cursor.fetchone()
-                        if result and result[0]:
-                            return float(result[0])
-                    else:
-                        pass
-                else:
-                    pass
-        except Exception as e:
-            pass
-        return 0.0
+            summary = self.sales_manager.get_sales_summary()
+            return summary.get('total_revenue', 0.0)
+        except Exception:
+            return 0.0
 
     def get_revenue_weekly_change(self):
-        """Calculate the revenue change percentage over the past week"""
         try:
-            if not hasattr(self, 'db_connection') or self.db_connection is None:
-                self.db_connection = DatabaseManager.get_sqlite_connection()
-                
-            if self.db_connection:
-                cursor = self.db_connection.cursor()
-                
-                # Get current date
-                current_date = datetime.now()
-                
-                # Current week (last 7 days including today)
-                current_week_start = (current_date - timedelta(days=6)).strftime("%Y-%m-%d")
-                current_week_end = current_date.strftime("%Y-%m-%d")
-                
-                # Previous week (7 days before the current week)
-                previous_week_start = (current_date - timedelta(days=13)).strftime("%Y-%m-%d")
-                previous_week_end = (current_date - timedelta(days=7)).strftime("%Y-%m-%d")
-                
-                # Query revenue for current week
-                cursor.execute("""
-                    SELECT SUM(total_price) 
-                    FROM sales 
-                    WHERE date(sale_date) BETWEEN date(?) AND date(?)
-                """, (current_week_start, current_week_end))
-                
-                current_revenue = cursor.fetchone()[0]
-                current_revenue = float(current_revenue) if current_revenue is not None else 0
-                
-                # Query revenue for previous week
-                cursor.execute("""
-                    SELECT SUM(total_price) 
-                    FROM sales 
-                    WHERE date(sale_date) BETWEEN date(?) AND date(?)
-                """, (previous_week_start, previous_week_end))
-                
-                previous_revenue = cursor.fetchone()[0]
-                previous_revenue = float(previous_revenue) if previous_revenue is not None else 0
-                
-                # Calculate percentage change
-                if previous_revenue > 0:
-                    change_percent = ((current_revenue - previous_revenue) / previous_revenue) * 100
-                else:
-                    # If previous revenue was 0, use 100% if there's any revenue now
-                    change_percent = 100 if current_revenue > 0 else 0
-                    
-                return change_percent
-                
-        except Exception as e:
-            pass
-            
-        # Fallback if there's an error
-        return 3.2  # Default 3.2% increase
+            sales = self.sales_manager.list_sales()
+            if not sales:
+                return 0.0
+            # Group sales by week
+            from datetime import datetime, timedelta
+            now = datetime.now()
+            week_ago = now - timedelta(days=7)
+            prev_week_ago = now - timedelta(days=14)
+            curr_week_sales = [s for s in sales if hasattr(s, 'sale_date') and week_ago <= pd.to_datetime(s.sale_date) <= now]
+            prev_week_sales = [s for s in sales if hasattr(s, 'sale_date') and prev_week_ago <= pd.to_datetime(s.sale_date) < week_ago]
+            curr_revenue = sum(s.total_price for s in curr_week_sales)
+            prev_revenue = sum(s.total_price for s in prev_week_sales)
+            if prev_revenue > 0:
+                return ((curr_revenue - prev_revenue) / prev_revenue) * 100
+            elif curr_revenue > 0:
+                return 100.0
+            else:
+                return 0.0
+        except Exception:
+            return 0.0
 
     def get_customer_count(self):
-        """Get number of active customers"""
         try:
-            if self.db_connection:
-                cursor = self.db_connection.cursor()
-                
-                # Check if customers table exists
-                cursor.execute("""
-                    SELECT name FROM sqlite_master 
-                    WHERE type='table' AND name='customers'
-                """)
-                
-                if cursor.fetchone():
-                    cursor.execute("SELECT COUNT(id) FROM customers")
-                    result = cursor.fetchone()
-                    if result:
-                        return result[0]
-                else:
-                    pass
-        except Exception as e:
-            pass
-        return 120  # Default customer count
+            customers = get_db().child('customers').get().val() or {}
+            return len(customers)
+        except Exception:
+            return 0
 
     def get_pending_orders(self):
-        """Get number of pending orders"""
         try:
-            if self.db_connection:
-                cursor = self.db_connection.cursor()
-                
-                # Check if sales table exists
-                cursor.execute("""
-                    SELECT name FROM sqlite_master 
-                    WHERE type='table' AND name='sales'
-                """)
-                
-                if cursor.fetchone():
-                    # Get the column names in the sales table
-                    cursor.execute("PRAGMA table_info(sales)")
-                    columns = [row[1] for row in cursor.fetchall()]
-                    
-                    if "status" in columns and "due_amount" in columns:
-                        cursor.execute("""
-                            SELECT COUNT(id) FROM sales 
-                            WHERE status = 'pending' OR due_amount > 0
-                        """)
-                        result = cursor.fetchone()
-                        if result:
-                            return result[0]
-                    elif "id" in columns:
-                        # Just count all sales as a fallback
-                        cursor.execute("SELECT COUNT(id) FROM sales")
-                        result = cursor.fetchone()
-                        if result:
-                            return result[0]
-                else:
-                    pass
-        except Exception as e:
-            pass
-        return 5  # Default pending orders
+            sales = self.sales_manager.list_sales()
+            return sum(1 for s in sales if getattr(s, 'status', '').lower() == 'pending' or getattr(s, 'due_amount', 0) > 0)
+        except Exception:
+            return 0
 
     def get_todays_deliveries(self):
-        """Get number of deliveries scheduled for today"""
         try:
-            if self.db_connection:
-                cursor = self.db_connection.cursor()
-                
-                # Check if sales table exists with delivery_date column
-                cursor.execute("""
-                    SELECT name FROM sqlite_master 
-                    WHERE type='table' AND name='sales'
-                """)
-                
-                if cursor.fetchone():
-                    # Get the column names in the sales table
-                    cursor.execute("PRAGMA table_info(sales)")
-                    columns = [row[1] for row in cursor.fetchall()]
-                    
-                    if "delivery_date" in columns:
-                        cursor.execute("""
-                            SELECT COUNT(id) FROM sales 
-                            WHERE delivery_date = date('now')
-                        """)
-                        result = cursor.fetchone()
-                        if result:
-                            return result[0]
-                else:
-                    pass
-        except Exception as e:
-            pass
-        return 3  # Default deliveries today
+            sales = self.sales_manager.list_sales()
+            today = datetime.now().strftime('%Y-%m-%d')
+            return sum(1 for s in sales if hasattr(s, 'delivery_date') and getattr(s, 'delivery_date', '') == today)
+        except Exception:
+            return 0
 
     def get_main_window(self):
         """
@@ -865,181 +741,40 @@ class DashboardPage(QWidget):
             # Ideally, we would filter for low stock items
 
     def get_recent_activities(self):
-        """Get recent activities from the database"""
         activities = []
         try:
-            if not hasattr(self, 'db_connection') or self.db_connection is None:
-                self.db_connection = DatabaseManager.get_sqlite_connection()
-                
-            if self.db_connection:
-                cursor = self.db_connection.cursor()
-                
-                # Check for sales table
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sales'")
-                has_sales_table = cursor.fetchone() is not None
-                
-                # Check for inventory table
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='inventory'")
-                has_inventory_table = cursor.fetchone() is not None
-                
-                # Check for customers table
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='customers'")
-                has_customers_table = cursor.fetchone() is not None
-                
-                # Get recent sales
-                if has_sales_table:
-                    # Check if sales table has the required columns
-                    cursor.execute("PRAGMA table_info(sales)")
-                    columns = [row[1] for row in cursor.fetchall()]
-                    
-                    if "customer_name" in columns and "sale_date" in columns and "total_price" in columns:
-                        cursor.execute("""
-                            SELECT id, customer_name, total_price, sale_date
-                            FROM sales
-                            ORDER BY sale_date DESC
-                            LIMIT 4
-                        """)
-                        
-                        for row in cursor.fetchall():
-                            sale_id, customer_name, total_price, sale_date = row
-                            time_ago = self.time_value(sale_date)
-                            
-                            activities.append({
-                                "icon": "💰",
-                                "title": f"Sale to {customer_name}",
-                                "value": f"${float(total_price):.2f}",
-                                "time": time_ago,
-                                "activity_type": "sale",
-                                "item_id": sale_id
-                            })
-                
-                # Get recent inventory changes
-                if has_inventory_table:
-                    # Check if inventory table has last_updated column
-                    cursor.execute("PRAGMA table_info(inventory)")
-                    inventory_columns = [row[1] for row in cursor.fetchall()]
-                    
-                    if "last_updated" in inventory_columns:
-                        cursor.execute("""
-                            SELECT id, name, last_updated
-                            FROM inventory
-                            ORDER BY last_updated DESC
-                            LIMIT 3
-                        """)
-                        
-                        for row in cursor.fetchall():
-                            product_id, product_name, timestamp = row
-                            
-                            if timestamp:
-                                time_ago = self.time_value(timestamp)
-                                
-                                activities.append({
-                                    "icon": "📦",
-                                    "title": f"Inventory Updated",
-                                    "value": product_name,
-                                    "time": time_ago,
-                                    "activity_type": "inventory",
-                                    "item_id": product_id
-                                })
-                    else:
-                        # Alternative query without using last_updated
-                        cursor.execute("""
-                            SELECT id, name
-                            FROM inventory
-                            LIMIT 3
-                        """)
-                        
-                        for row in cursor.fetchall():
-                            product_id, product_name = row
-                            # Use current time as fallback
-                            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            time_ago = self.time_value(current_time)
-                            
-                            activities.append({
-                                "icon": "📦",
-                                "title": f"Inventory Item",
-                                "value": product_name,
-                                "time": time_ago,
-                                "activity_type": "inventory",
-                                "item_id": product_id
-                            })
-                
-                # Get recent customers
-                if has_customers_table:
-                    # Check if customers table has the required columns
-                    cursor.execute("PRAGMA table_info(customers)")
-                    columns = [row[1] for row in cursor.fetchall()]
-                    
-                    created_at_column = "created_at" if "created_at" in columns else None
-                    name_column = "full_name" if "full_name" in columns else "name"
-                    
-                    if created_at_column and name_column in columns:
-                        cursor.execute(f"""
-                            SELECT id, {name_column}, {created_at_column}
-                            FROM customers
-                            ORDER BY {created_at_column} DESC
-                            LIMIT 2
-                        """)
-                        
-                        for row in cursor.fetchall():
-                            customer_id, customer_name, created_at = row
-                            time_ago = self.time_value(created_at)
-                            
-                            activities.append({
-                                "icon": "👤",
-                                "title": "New Customer",
-                                "value": customer_name,
-                                "time": time_ago,
-                                "activity_type": "customer",
-                                "item_id": customer_id
-                            })
-                
-                # Sort by time (most recent first)
-                activities.sort(key=lambda x: self.time_value(x["time"]), reverse=True)
-                
-        except Exception as e:
-            pass
-            
-        # If no activities were found, provide fallback data
-        if not activities:
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
-            
-            activities = [
-                {
+            sales = self.sales_manager.list_sales()
+            for s in sorted(sales, key=lambda x: getattr(x, 'sale_date', ''), reverse=True)[:4]:
+                activities.append({
                     "icon": "💰",
-                    "title": "Sale to John Doe",
-                    "value": "$129.99",
-                    "time": self.time_value(current_time),
+                    "title": f"Sale to {getattr(s, 'customer_name', 'Unknown')}",
+                    "value": f"${getattr(s, 'total_price', 0):.2f}",
+                    "time": getattr(s, 'sale_date', ''),
                     "activity_type": "sale",
-                    "item_id": 1
-                },
-                {
+                    "item_id": getattr(s, 'id', None)
+                })
+            inventory = self.inventory_manager.list_products()
+            for p in inventory[:3]:
+                activities.append({
                     "icon": "📦",
                     "title": "Inventory Updated",
-                    "value": "Smartphone X1",
-                    "time": self.time_value(current_time),
+                    "value": getattr(p, 'name', 'Unknown'),
+                    "time": getattr(p, 'created_at', ''),
                     "activity_type": "inventory",
-                    "item_id": 1
-                },
-                {
+                    "item_id": getattr(p, 'id', None)
+                })
+            customers = get_db().child('customers').get().val() or {}
+            for i, (cid, cust) in enumerate(list(customers.items())[:2]):
+                activities.append({
                     "icon": "👤",
                     "title": "New Customer",
-                    "value": "Jane Smith",
-                    "time": self.time_value(yesterday),
+                    "value": cust.get('name', 'Unknown'),
+                    "time": cust.get('joined', ''),
                     "activity_type": "customer",
-                    "item_id": 1
-                },
-                {
-                    "icon": "⚠️",
-                    "title": "Low Stock Alert",
-                    "value": "Laptop Pro",
-                    "time": self.time_value(yesterday),
-                    "activity_type": "alert",
-                    "item_id": 2
-                }
-            ]
-            
+                    "item_id": cid
+                })
+        except Exception:
+            pass
         return activities
 
     def time_value(self, time_str):
@@ -1087,25 +822,49 @@ class DashboardPage(QWidget):
                 self.clear_layout(item.layout())
 
     def get_weekly_sales_data(self):
-        # Always return sample data for testing
-        return {
-            "labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-            "data": [1200, 1900, 1500, 2100, 2400, 1800, 2800]
-        }
+        try:
+            sales = self.sales_manager.list_sales()
+            from datetime import datetime, timedelta
+            now = datetime.now()
+            labels = [(now - timedelta(days=i)).strftime('%a') for i in range(6, -1, -1)]
+            data = [0]*7
+            for s in sales:
+                if hasattr(s, 'sale_date'):
+                    idx = (now - pd.to_datetime(s.sale_date)).days
+                    if 0 <= idx < 7:
+                        data[6-idx] += getattr(s, 'total_price', 0)
+            return {"labels": labels, "data": data}
+        except Exception:
+            return {"labels": [], "data": []}
 
     def get_stock_flow_data(self):
-        # Always return sample data for testing
-        return {
-            "labels": ["Low", "Medium", "High", "Orders"],
-            "data": [8, 15, 25, 5]
-        }
+        try:
+            products = self.inventory_manager.list_products()
+            low = sum(1 for p in products if getattr(p, 'quantity', 0) < 5)
+            medium = sum(1 for p in products if 5 <= getattr(p, 'quantity', 0) < 20)
+            high = sum(1 for p in products if getattr(p, 'quantity', 0) >= 20)
+            orders = self.get_pending_orders()
+            return {"labels": ["Low", "Medium", "High", "Orders"], "data": [low, medium, high, orders]}
+        except Exception:
+            return {"labels": [], "data": []}
 
     def get_quarterly_profit_data(self):
-        # Always return sample data for testing
-        return {
-            "labels": ["Q1", "Q2", "Q3", "Q4"],
-            "data": [5000, 7500, 4000, 9000]
-        }
+        try:
+            sales = self.sales_manager.list_sales()
+            from datetime import datetime
+            now = datetime.now()
+            quarters = [((now.month-1)//3+1)-i for i in range(4)]
+            data = [0]*4
+            labels = [f"Q{q}" for q in reversed(quarters)]
+            for s in sales:
+                if hasattr(s, 'sale_date'):
+                    month = pd.to_datetime(s.sale_date).month
+                    q = (month-1)//3
+                    idx = 3-q if 0 <= q < 4 else 0
+                    data[idx] += getattr(s, 'total_price', 0)
+            return {"labels": labels, "data": data}
+        except Exception:
+            return {"labels": [], "data": []}
 
     def on_data_refreshed(self):
         # Update the last updated label

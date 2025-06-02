@@ -1,11 +1,11 @@
-import sqlite3
 from datetime import datetime
 import json
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QFrame, 
     QPushButton, QLineEdit, QSizePolicy, QSpacerItem, QTableWidget, 
     QTableWidgetItem, QDialog, QFormLayout, QDateEdit, QDoubleSpinBox, 
-    QComboBox, QMessageBox, QTabWidget, QHeaderView, QTextEdit, QDialogButtonBox
+    QComboBox, QMessageBox, QTabWidget, QHeaderView, QTextEdit, QDialogButtonBox,
+    QListWidget, QListWidgetItem, QSpinBox, QGroupBox
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QFont, QColor, QIcon
@@ -13,6 +13,7 @@ from app.utils.theme_manager import ThemeManager
 from app.views.widgets.components import Card, Button, TableComponent
 from app.views.widgets.card_widget import CardWidget
 from app.views.widgets.action_button import ActionButton
+from app.core.sales import SalesManager
 
 class SaleDialog(QDialog):
     def __init__(self, parent=None, sale=None):
@@ -94,127 +95,242 @@ class SaleDialog(QDialog):
 class SalesView(QWidget):
     def __init__(self, parent=None, controller=None):
         super().__init__(parent)
-        self.controller = controller  # Pass your controller here
-        self.selected_row = None
+        self.controller = controller
+        self.cart = []  # List of cart items
+        self.products = [
+            {"name": "iPhone 14 Pro", "price": 999.99, "stock": 15},
+            {"name": "Samsung Galaxy S23", "price": 799.99, "stock": 3},
+            {"name": "Nike Air Max 90", "price": 120.00, "stock": 25},
+            {"name": "MacBook Pro 14\"", "price": 1999.99, "stock": 1},
+        ]
         self.init_ui()
-        self.refresh_table()
 
     def init_ui(self):
-        # Use the app's main theme instead of custom styling
-        main_layout = QVBoxLayout(self)
-        main_layout.setSpacing(16)
+        main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(24)
 
-        # Page header
-        header = QLabel("Sales Dashboard")
-        header.setObjectName("page-title")
-        header.setFont(QFont(ThemeManager.FONTS["family"], ThemeManager.FONTS["size_xxlarge"], QFont.Bold))
-        main_layout.addWidget(header)
-        
-        # Quick actions bar
-        actions_card = Card("Quick Actions")
-        actions_layout = QHBoxLayout()
-        
-        self.add_sale_btn = Button('Add Sale', variant="primary")
-        self.add_sale_btn.clicked.connect(self.add_sale)
-        actions_layout.addWidget(self.add_sale_btn)
-        
-        self.edit_sale_btn = Button('Edit Sale')
-        self.edit_sale_btn.clicked.connect(self.edit_sale)
-        actions_layout.addWidget(self.edit_sale_btn)
-        
-        self.delete_sale_btn = Button('Delete Sale', variant="danger")
-        self.delete_sale_btn.clicked.connect(self.delete_sale)
-        actions_layout.addWidget(self.delete_sale_btn)
-        
-        self.view_sale_btn = Button('View Sale')
-        self.view_sale_btn.clicked.connect(self.view_sale)
-        actions_layout.addWidget(self.view_sale_btn)
-        
-        actions_layout.addStretch()
-        actions_card.layout.addLayout(actions_layout)
-        main_layout.addWidget(actions_card)
+        # Left: Product Search & List
+        left_panel = QVBoxLayout()
+        left_panel.setSpacing(16)
 
-        # Dashboard cards section
-        dashboard_layout = QGridLayout()
-        dashboard_layout.setSpacing(16)
-        
-        # Row 1
-        self.card_pending = Card("Pending Invoices")
-        pending_layout = QVBoxLayout()
-        pending_value = QLabel("3")
-        pending_value.setFont(QFont(ThemeManager.FONTS["family"], 24, QFont.Bold))
-        pending_value.setStyleSheet(f"color: {ThemeManager.get_color('primary')};")
-        pending_subtitle = QLabel("Due Soon: 2")
-        pending_subtitle.setStyleSheet(f"color: {ThemeManager.get_color('text_secondary')};")
-        pending_layout.addWidget(pending_value)
-        pending_layout.addWidget(pending_subtitle)
-        self.card_pending.layout.addLayout(pending_layout)
-        dashboard_layout.addWidget(self.card_pending, 0, 0)
-        
-        self.card_recent = Card("Recent Sales")
-        recent_layout = QVBoxLayout()
-        recent_value = QLabel("10 min ago")
-        recent_value.setFont(QFont(ThemeManager.FONTS["family"], 18))
-        recent_value.setStyleSheet(f"color: {ThemeManager.get_color('primary')};")
-        recent_subtitle = QLabel("Total Sales: 150")
-        recent_subtitle.setStyleSheet(f"color: {ThemeManager.get_color('text_secondary')};")
-        recent_layout.addWidget(recent_value)
-        recent_layout.addWidget(recent_subtitle)
-        self.card_recent.layout.addLayout(recent_layout)
-        dashboard_layout.addWidget(self.card_recent, 0, 1)
-        
-        self.card_top = Card("Top Customers")
-        top_layout = QVBoxLayout()
-        top_customer1 = QLabel("John Doe: $5,000")
-        top_customer1.setStyleSheet(f"color: {ThemeManager.get_color('primary')};")
-        top_customer2 = QLabel("Alice Smith: $4,200")
-        top_customer2.setStyleSheet(f"color: {ThemeManager.get_color('text_secondary')};")
-        top_layout.addWidget(top_customer1)
-        top_layout.addWidget(top_customer2)
-        self.card_top.layout.addLayout(top_layout)
-        dashboard_layout.addWidget(self.card_top, 0, 2)
-        
-        # Row 2
-        self.card_status = Card("Order Status")
-        status_layout = QVBoxLayout()
-        completed = QLabel("Completed: 45")
-        completed.setStyleSheet(f"color: {ThemeManager.get_color('success')};")
-        deliveries = QLabel("Deliveries Today: 8")
-        canceled = QLabel("Canceled: 2")
-        canceled.setStyleSheet(f"color: {ThemeManager.get_color('danger')};")
-        status_layout.addWidget(completed)
-        status_layout.addWidget(deliveries)
-        status_layout.addWidget(canceled)
-        self.card_status.layout.addLayout(status_layout)
-        dashboard_layout.addWidget(self.card_status, 1, 0)
-        
-        main_layout.addLayout(dashboard_layout)
+        # Header
+        header = QLabel("Point of Sale")
+        header.setFont(QFont(ThemeManager.FONTS["family"], 28, QFont.Bold))
+        left_panel.addWidget(header)
+        subtitle = QLabel("Process customer transactions quickly and efficiently")
+        subtitle.setStyleSheet("color: #888;")
+        left_panel.addWidget(subtitle)
 
-        # --- Sales Table Section ---
-        table_card = Card("Sales Records")
-        table_layout = QVBoxLayout()
+        # Product Search Card
+        product_card = Card()
+        product_card.layout.setSpacing(16)
+        product_card.layout.setContentsMargins(16, 16, 16, 16)
+        product_card.layout.addWidget(self._product_search_section())
+        left_panel.addWidget(product_card)
+        left_panel.addStretch()
+        main_layout.addLayout(left_panel, 2)
+
+        # Right: Cart & Order Summary
+        right_panel = QVBoxLayout()
+        right_panel.setSpacing(16)
+        right_panel.addWidget(self._cart_section())
+        right_panel.addWidget(self._order_summary_section())
+        right_panel.addStretch()
+        main_layout.addLayout(right_panel, 1)
+
+    def _product_search_section(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setSpacing(12)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Title
+        title = QLabel("Product Search")
+        title.setFont(QFont(ThemeManager.FONTS["family"], 18, QFont.Bold))
+        layout.addWidget(title)
         
         # Search bar
-        search_layout = QHBoxLayout()
-        search_label = QLabel("Search:")
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search by customer or invoice...")
-        self.search_input.textChanged.connect(self.refresh_table)
-        search_layout.addWidget(search_label)
-        search_layout.addWidget(self.search_input)
-        table_layout.addLayout(search_layout)
-        
-        # Table
-        self.table = TableComponent()
-        self.table.setup_columns(["Invoice", "Date", "Customer", "Total", "Payment", "Status"])
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.clicked.connect(self.on_table_clicked)
-        table_layout.addWidget(self.table)
-        
-        table_card.layout.addLayout(table_layout)
-        main_layout.addWidget(table_card)
+        self.search_input.setPlaceholderText("Search by product name or scan barcode...")
+        self.search_input.textChanged.connect(self.refresh_products)
+        layout.addWidget(self.search_input)
+
+        # Product list
+        self.product_list = QVBoxLayout()
+        self._populate_product_list()
+        layout.addLayout(self.product_list)
+        return widget
+
+    def _populate_product_list(self):
+        # Clear previous
+        while self.product_list.count():
+            item = self.product_list.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        # Filter products
+        search = self.search_input.text().lower() if hasattr(self, 'search_input') else ""
+        for product in self.products:
+            if search and search not in product["name"].lower():
+                continue
+            card = QFrame()
+            card.setFrameShape(QFrame.StyledPanel)
+            card.setStyleSheet("border: 1px solid #eee; border-radius: 8px;")
+            card_layout = QHBoxLayout(card)
+            card_layout.setContentsMargins(12, 8, 12, 8)
+            # Name & stock
+            name = QLabel(f"{product['name']}")
+            name.setFont(QFont(ThemeManager.FONTS["family"], 14, QFont.Bold))
+            card_layout.addWidget(name, 2)
+            stock = QLabel(f"Stock: {product['stock']}")
+            stock.setStyleSheet("color: #888;")
+            card_layout.addWidget(stock, 1)
+            # Price
+            price = QLabel(f"${product['price']:.2f}")
+            price.setFont(QFont(ThemeManager.FONTS["family"], 13, QFont.Bold))
+            card_layout.addWidget(price, 1)
+            # Add button
+            add_btn = Button("+ Add", variant="primary")
+            add_btn.clicked.connect(lambda _, p=product: self.add_to_cart(p))
+            card_layout.addWidget(add_btn, 1)
+            layout_item = QVBoxLayout()
+            layout_item.addWidget(card)
+            self.product_list.addWidget(card)
+
+    def refresh_products(self):
+        self._populate_product_list()
+
+    def _cart_section(self):
+        card = Card("Shopping Cart")
+        card.layout.setSpacing(8)
+        card.layout.setContentsMargins(16, 16, 16, 16)
+        self.cart_list = QVBoxLayout()
+        self.refresh_cart()
+        card.layout.addLayout(self.cart_list)
+        return card
+
+    def refresh_cart(self):
+        # Clear previous
+        while self.cart_list.count():
+            item = self.cart_list.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        # Add cart items
+        for item in self.cart:
+            row = QFrame()
+            row.setFrameShape(QFrame.StyledPanel)
+            row.setStyleSheet("border: 1px solid #eee; border-radius: 6px;")
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(8, 4, 8, 4)
+            # Name
+            name = QLabel(item['name'])
+            name.setMinimumWidth(120)
+            row_layout.addWidget(name, 2)
+            # Price each
+            price = QLabel(f"${item['price']:.2f} each")
+            price.setStyleSheet("color: #888;")
+            row_layout.addWidget(price, 1)
+            # Quantity controls
+            minus_btn = Button("-", variant="secondary")
+            minus_btn.clicked.connect(lambda _, i=item: self.change_quantity(i, -1))
+            row_layout.addWidget(minus_btn)
+            qty = QLabel(str(item['qty']))
+            qty.setMinimumWidth(24)
+            qty.setAlignment(Qt.AlignCenter)
+            row_layout.addWidget(qty)
+            plus_btn = Button("+", variant="secondary")
+            plus_btn.clicked.connect(lambda _, i=item: self.change_quantity(i, 1))
+            row_layout.addWidget(plus_btn)
+            # Total price
+            total = QLabel(f"${item['price']*item['qty']:.2f}")
+            total.setFont(QFont(ThemeManager.FONTS["family"], 12, QFont.Bold))
+            row_layout.addWidget(total, 1)
+            # Remove
+            remove_btn = Button("🗑", variant="danger")
+            remove_btn.clicked.connect(lambda _, i=item: self.remove_from_cart(i))
+            row_layout.addWidget(remove_btn)
+            self.cart_list.addWidget(row)
+
+    def add_to_cart(self, product):
+        for item in self.cart:
+            if item['name'] == product['name']:
+                if item['qty'] < product['stock']:
+                    item['qty'] += 1
+                self.refresh_cart()
+                return
+        self.cart.append({"name": product['name'], "price": product['price'], "qty": 1, "stock": product['stock']})
+        self.refresh_cart()
+
+    def change_quantity(self, item, delta):
+        for cart_item in self.cart:
+            if cart_item['name'] == item['name']:
+                new_qty = cart_item['qty'] + delta
+                if 1 <= new_qty <= cart_item['stock']:
+                    cart_item['qty'] = new_qty
+                elif new_qty < 1:
+                    self.cart.remove(cart_item)
+                self.refresh_cart()
+                return
+
+    def remove_from_cart(self, item):
+        self.cart = [i for i in self.cart if i['name'] != item['name']]
+        self.refresh_cart()
+
+    def _order_summary_section(self):
+        card = Card("Order Summary")
+        card.layout.setSpacing(12)
+        card.layout.setContentsMargins(16, 16, 16, 16)
+        # Subtotal, tax, total
+        self.subtotal_label = QLabel()
+        self.tax_label = QLabel()
+        self.total_label = QLabel()
+        self.update_summary()
+        card.layout.addWidget(self.subtotal_label)
+        card.layout.addWidget(self.tax_label)
+        card.layout.addWidget(self.total_label)
+        # Payment method
+        pm_label = QLabel("Payment Method")
+        pm_label.setFont(QFont(ThemeManager.FONTS["family"], 12, QFont.Bold))
+        card.layout.addWidget(pm_label)
+        pm_row = QHBoxLayout()
+        self.cash_btn = Button("\U0001F4B0 Cash", variant="primary")
+        self.card_btn = Button("\U0001F4B3 Card", variant="secondary")
+        self.cash_btn.setCheckable(True)
+        self.card_btn.setCheckable(True)
+        self.cash_btn.setChecked(True)
+        self.cash_btn.clicked.connect(lambda: self.set_payment_method('cash'))
+        self.card_btn.clicked.connect(lambda: self.set_payment_method('card'))
+        pm_row.addWidget(self.cash_btn)
+        pm_row.addWidget(self.card_btn)
+        card.layout.addLayout(pm_row)
+        # Amount paid
+        self.amount_paid_input = QLineEdit()
+        self.amount_paid_input.setPlaceholderText("Enter amount paid")
+        card.layout.addWidget(self.amount_paid_input)
+        # Complete sale
+        self.complete_btn = Button("\U0001F4C4 Complete Sale", variant="primary")
+        self.complete_btn.setEnabled(False)
+        card.layout.addWidget(self.complete_btn)
+        # Print receipt
+        self.print_btn = Button("\U0001F5B6 Print Receipt", variant="secondary")
+        card.layout.addWidget(self.print_btn)
+        return card
+
+    def update_summary(self):
+        subtotal = sum(item['price'] * item['qty'] for item in self.cart)
+        tax = subtotal * 0.10
+        total = subtotal + tax
+        self.subtotal_label.setText(f"Subtotal: <b>${subtotal:.2f}</b>")
+        self.tax_label.setText(f"Tax (10%): <b>${tax:.2f}</b>")
+        self.total_label.setText(f"Total: <span style='font-size:18px; color:#222;'><b>${total:.2f}</b></span>")
+
+    def set_payment_method(self, method):
+        if method == 'cash':
+            self.cash_btn.setChecked(True)
+            self.card_btn.setChecked(False)
+        else:
+            self.cash_btn.setChecked(False)
+            self.card_btn.setChecked(True)
 
     def refresh_table(self):
         # Dummy data for demonstration; replace with controller/model call
