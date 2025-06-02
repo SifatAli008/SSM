@@ -196,15 +196,15 @@ class ReportsView(QWidget):
             
             # Get inventory data
             inventory_data = self.controller.get_inventory_value()
-            self.inventory_card.update_value(f"${inventory_data.get('total_value', 0):,.2f}")
+            self.inventory_card.update_values(f"${inventory_data.get('total_value', 0):,.2f}")
             self.stock_value_label.setText(f"Stock Value: ${inventory_data.get('total_value', 0):,.2f}")
             self.total_items_label.setText(f"Total Items: {inventory_data.get('total_items', 0):,}")
             self.low_stock_label.setText(f"Low Stock Items: {inventory_data.get('low_stock_items', 0):,}")
             
             # Get profit data
             profit_data = self.controller.get_profit_summary(period)
-            self.profit_card.update_value(f"${profit_data.get('net_profit', 0):,.2f}")
-            self.expenses_card.update_value(f"${profit_data.get('total_expenses', 0):,.2f}")
+            self.profit_card.update_values(f"${profit_data.get('net_profit', 0):,.2f}")
+            self.expenses_card.update_values(f"${profit_data.get('total_expenses', 0):,.2f}")
             
             self.total_expenses_label.setText(f"Total Expenses: ${profit_data.get('total_expenses', 0):,.2f}")
             self.profit_margin_label.setText(f"Profit Margin: {profit_data.get('profit_margin', 0):.1f}%")
@@ -335,7 +335,20 @@ class ReportsView(QWidget):
         # Card 4: Active Customers
         self.cust_card = CardWidget("Active Customers", "0", icon="👥")
         cards_row.addWidget(self.cust_card)
+        # Card 5: Net Profit
+        self.profit_card = CardWidget("Net Profit", "$0.00", icon="💹")
+        cards_row.addWidget(self.profit_card)
+        # Card 6: Total Expenses
+        self.expenses_card = CardWidget("Total Expenses", "$0.00", icon="💸")
+        cards_row.addWidget(self.expenses_card)
         layout.addLayout(cards_row)
+        # Add summary labels for total expenses and profit margin
+        self.total_expenses_label = QLabel("Total Expenses: $0.00")
+        self.profit_margin_label = QLabel("Profit Margin: 0.0%")
+        for lbl in (self.total_expenses_label, self.profit_margin_label):
+            lbl.setFont(QFont(ThemeManager.FONTS["family"], 12))
+            lbl.setStyleSheet("color: #555;")
+            layout.addWidget(lbl)
         # Charts row
         charts_row = QHBoxLayout()
         charts_row.setSpacing(20)
@@ -441,6 +454,17 @@ class ReportsView(QWidget):
         subtitle = QLabel("Current stock levels and alerts")
         subtitle.setStyleSheet("color: #888; font-size: 15px;")
         layout.addWidget(subtitle)
+        # Add inventory summary card at the top
+        self.inventory_card = CardWidget("Inventory Value", "$0.00", icon="📦")
+        layout.addWidget(self.inventory_card)
+        # Add summary labels for stock value, total items, and low stock
+        self.stock_value_label = QLabel("Stock Value: $0.00")
+        self.total_items_label = QLabel("Total Items: 0")
+        self.low_stock_label = QLabel("Low Stock Items: 0")
+        for lbl in (self.stock_value_label, self.total_items_label, self.low_stock_label):
+            lbl.setFont(QFont(ThemeManager.FONTS["family"], 12))
+            lbl.setStyleSheet("color: #555;")
+            layout.addWidget(lbl)
         # Fetch real inventory data by category
         try:
             if hasattr(self.controller, 'get_inventory_by_category'):
@@ -530,7 +554,7 @@ class ReportsView(QWidget):
         layout.addWidget(left_card, 2)
         # Right: Customer Metrics card
         right_card = QFrame()
-        right_card.setStyleSheet("background: #fff; border: none; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);")
+        right_card.setStyleSheet("background: #fff; border: none; border-radius: 16px;")
         right_layout = QVBoxLayout(right_card)
         right_layout.setContentsMargins(32, 24, 32, 24)
         right_layout.setSpacing(10)
@@ -550,7 +574,7 @@ class ReportsView(QWidget):
             ("Avg Customer Value", "$432"),
             ("Avg Orders per Customer", "4.2")]):
             card = CardWidget(title, value)
-            card.setStyleSheet("background: #fff; border: none; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.03); min-width: 160px; min-height: 80px; font-size: 15px;")
+            card.setStyleSheet("background: #fff; border: none; border-radius: 12px; min-width: 160px; min-height: 80px; font-size: 15px;")
             grid.addWidget(card, i // 2, i % 2)
         right_layout.addStretch(1)
         right_layout.addLayout(grid)

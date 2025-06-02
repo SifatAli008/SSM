@@ -138,7 +138,6 @@ class InventoryView(QWidget):
                 padding: 20px;
                 background-color: #ffffff;
                 margin-top: 15px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             }
             QTableView {
                 border: 1px solid #e0e0e0;
@@ -203,7 +202,6 @@ class InventoryView(QWidget):
                 border: none;
                 border-radius: 12px;
                 padding: 20px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             }
             QLabel#cardTitle {
                 font-weight: bold;
@@ -378,11 +376,6 @@ class InventoryView(QWidget):
                     padding: 20px;
                     border: 1px solid #e0e0e0;
                 }}
-                #cardFrame:hover {{
-                    border-color: {card['color']};
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                    transform: translateY(-2px);
-                }}
             """)
             
             cards_layout.addWidget(frame)
@@ -397,14 +390,6 @@ class InventoryView(QWidget):
         # Main container frame with improved styling
         table_frame = QFrame()
         table_frame.setObjectName("cardFrame")
-        table_frame.setStyleSheet("""
-            #cardFrame {
-                background-color: white;
-                border-radius: 12px;
-                padding: 20px;
-                border: 1px solid #e0e0e0;
-            }
-        """)
         table_layout = QVBoxLayout(table_frame)
         table_layout.setContentsMargins(0, 0, 0, 0)
 

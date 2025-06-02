@@ -589,7 +589,8 @@ class DashboardPage(QWidget):
 
     def get_customer_count(self):
         try:
-            customers = get_db().child('customers').get().val() or {}
+            customers_obj = get_db().child('customers').get()
+            customers = customers_obj.val() if hasattr(customers_obj, 'val') else customers_obj or {}
             return len(customers)
         except Exception:
             return 0
@@ -763,7 +764,8 @@ class DashboardPage(QWidget):
                     "activity_type": "inventory",
                     "item_id": getattr(p, 'id', None)
                 })
-            customers = get_db().child('customers').get().val() or {}
+            customers_obj = get_db().child('customers').get()
+            customers = customers_obj.val() if hasattr(customers_obj, 'val') else customers_obj or {}
             for i, (cid, cust) in enumerate(list(customers.items())[:2]):
                 activities.append({
                     "icon": "👤",
@@ -840,9 +842,9 @@ class DashboardPage(QWidget):
     def get_stock_flow_data(self):
         try:
             products = self.inventory_manager.list_products()
-            low = sum(1 for p in products if getattr(p, 'quantity', 0) < 5)
-            medium = sum(1 for p in products if 5 <= getattr(p, 'quantity', 0) < 20)
-            high = sum(1 for p in products if getattr(p, 'quantity', 0) >= 20)
+            low = sum(1 for p in products if (getattr(p, 'quantity', 0) or 0) < 5)
+            medium = sum(1 for p in products if 5 <= (getattr(p, 'quantity', 0) or 0) < 20)
+            high = sum(1 for p in products if (getattr(p, 'quantity', 0) or 0) >= 20)
             orders = self.get_pending_orders()
             return {"labels": ["Low", "Medium", "High", "Orders"], "data": [low, medium, high, orders]}
         except Exception:

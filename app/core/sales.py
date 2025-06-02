@@ -44,11 +44,38 @@ class SalesManager:
             print(f"Failed to delete sale: {e}")
             return False
     
+    def filter_to_model(self, model, data):
+        # Support Pydantic v1 (__fields__), v2 (model_fields), or fallback to __annotations__
+        if hasattr(model, 'model_fields'):
+            allowed = set(model.model_fields.keys())
+        elif hasattr(model, '__fields__'):
+            allowed = set(model.__fields__.keys())
+        elif hasattr(model, '__annotations__'):
+            allowed = set(model.__annotations__.keys())
+        else:
+            allowed = set()
+        return {k: v for k, v in data.items() if k in allowed}
+    
     def get_sale(self, sale_id: int) -> Optional[Sale]:
         """Get sale by ID from Firebase."""
         try:
-            data = self.db.child(sale_id).get().val()
+            data_obj = self.db.child(sale_id).get()
+            data = data_obj.val() if hasattr(data_obj, 'val') else data_obj
             if data:
+                if 'amount' in data:
+                    data['total_amount'] = data.pop('amount')
+                if 'customer' in data:
+                    data.pop('customer')
+                if 'date' in data:
+                    data.pop('date')
+                if 'product' in data:
+                    data.pop('product')
+                if 'quantity' in data:
+                    data.pop('quantity')
+                # Normalize numeric fields
+                if 'total_amount' in data and data['total_amount'] is None:
+                    data['total_amount'] = 0
+                data = self.filter_to_model(Sale, data)
                 return Sale(**data)
             return None
         except Exception as e:
@@ -58,8 +85,25 @@ class SalesManager:
     def list_sales(self, customer_id: Optional[int] = None) -> List[Sale]:
         """List all sales, optionally filtered by customer_id, from Firebase."""
         try:
-            all_data = self.db.get().val() or {}
-            sales = [Sale(**v) for v in all_data.values()]
+            all_data_obj = self.db.get()
+            all_data = all_data_obj.val() if hasattr(all_data_obj, 'val') else all_data_obj or {}
+            sales = []
+            for v in all_data.values():
+                if 'amount' in v:
+                    v['total_amount'] = v.pop('amount')
+                if 'customer' in v:
+                    v.pop('customer')
+                if 'date' in v:
+                    v.pop('date')
+                if 'product' in v:
+                    v.pop('product')
+                if 'quantity' in v:
+                    v.pop('quantity')
+                # Normalize numeric fields
+                if 'total_amount' in v and v['total_amount'] is None:
+                    v['total_amount'] = 0
+                v = self.filter_to_model(Sale, v)
+                sales.append(Sale(**v))
             if customer_id:
                 sales = [s for s in sales if s.customer_id == customer_id]
             return sales
@@ -75,10 +119,27 @@ class SalesManager:
     def get_sales_summary(self) -> Dict[str, Any]:
         """Get sales summary from Firebase."""
         try:
-            all_data = self.db.get().val() or {}
-            sales = [Sale(**v) for v in all_data.values()]
+            all_data_obj = self.db.get()
+            all_data = all_data_obj.val() if hasattr(all_data_obj, 'val') else all_data_obj or {}
+            sales = []
+            for v in all_data.values():
+                if 'amount' in v:
+                    v['total_amount'] = v.pop('amount')
+                if 'customer' in v:
+                    v.pop('customer')
+                if 'date' in v:
+                    v.pop('date')
+                if 'product' in v:
+                    v.pop('product')
+                if 'quantity' in v:
+                    v.pop('quantity')
+                # Normalize numeric fields
+                if 'total_amount' in v and v['total_amount'] is None:
+                    v['total_amount'] = 0
+                v = self.filter_to_model(Sale, v)
+                sales.append(Sale(**v))
             total_sales = len(sales)
-            total_revenue = sum(s.total_price for s in sales)
+            total_revenue = sum(s.total_amount or 0 for s in sales)
             avg_sale = total_revenue / total_sales if total_sales > 0 else 0.0
             return {
                 'total_sales': total_sales,

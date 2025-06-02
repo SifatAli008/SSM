@@ -335,16 +335,20 @@ class ReportsController:
     def get_sales_by_category(self):
         """Return sales by category as (labels, values)"""
         try:
+            # Join sales with inventory to get category
             query = """
-                SELECT category, SUM(total_amount) FROM sales GROUP BY category
+                SELECT i.category, SUM(s.total_amount)
+                FROM sales s
+                LEFT JOIN inventory i ON s.inventory_id = i.id
+                GROUP BY i.category
             """
             result = self.db.execute_query(query)
-            labels = [row[0] for row in result]
+            labels = [row[0] if row[0] is not None else 'Unknown' for row in result]
             values = [float(row[1]) for row in result]
             return labels, values
         except Exception as e:
             logger.error(f"Error getting sales by category: {str(e)}")
-            return ["Electronics", "Clothing", "Food & Beverages", "Books"], [10, 20, 30, 40]
+            return ["Unknown"], [0]
 
     def get_customer_growth(self, months=6):
         """Return customer count for the last N months as (labels, values)"""

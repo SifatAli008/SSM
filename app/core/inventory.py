@@ -45,8 +45,29 @@ class InventoryManager:
     def get_product(self, product_id: str) -> Optional[Product]:
         """Get product by ID from Firebase."""
         try:
-            data = self.db.child(product_id).get().val()
+            data_obj = self.db.child(product_id).get()
+            data = data_obj.val() if hasattr(data_obj, 'val') else data_obj
             if data:
+                if 'buying_price' in data:
+                    data['cost'] = data.pop('buying_price')
+                elif 'cost_price' in data:
+                    data['cost'] = data.pop('cost_price')
+                if 'selling_price' in data:
+                    data.pop('selling_price')
+                if 'details' in data:
+                    data.pop('details')
+                if 'quantity' in data:
+                    data.pop('quantity')
+                if 'product' in data:
+                    data.pop('product')
+                if 'reorder_level' in data:
+                    data.pop('reorder_level')
+                # Normalize numeric fields
+                if 'cost' in data and data['cost'] is None:
+                    data['cost'] = 0
+                if 'quantity' in data and data['quantity'] is None:
+                    data['quantity'] = 0
+                data = filter_to_model(Product, data)
                 return Product(**data)
             return None
         except Exception as e:
@@ -56,8 +77,31 @@ class InventoryManager:
     def list_products(self, category: Optional[str] = None) -> List[Product]:
         """List all products, optionally filtered by category, from Firebase."""
         try:
-            all_data = self.db.get().val() or {}
-            products = [Product(**v) for v in all_data.values()]
+            all_data_obj = self.db.get()
+            all_data = all_data_obj.val() if hasattr(all_data_obj, 'val') else all_data_obj or {}
+            products = []
+            for v in all_data.values():
+                if 'buying_price' in v:
+                    v['cost'] = v.pop('buying_price')
+                elif 'cost_price' in v:
+                    v['cost'] = v.pop('cost_price')
+                if 'selling_price' in v:
+                    v.pop('selling_price')
+                if 'details' in v:
+                    v.pop('details')
+                if 'quantity' in v:
+                    v.pop('quantity')
+                if 'product' in v:
+                    v.pop('product')
+                if 'reorder_level' in v:
+                    v.pop('reorder_level')
+                # Normalize numeric fields
+                if 'cost' in v and v['cost'] is None:
+                    v['cost'] = 0
+                if 'quantity' in v and v['quantity'] is None:
+                    v['quantity'] = 0
+                v = filter_to_model(Product, v)
+                products.append(Product(**v))
             if category:
                 products = [p for p in products if p.category == category]
             return products
@@ -68,7 +112,8 @@ class InventoryManager:
     def update_stock(self, product_id: str, quantity: int) -> bool:
         """Update product stock level in Firebase."""
         try:
-            prod = self.db.child(product_id).get().val()
+            prod_obj = self.db.child(product_id).get()
+            prod = prod_obj.val() if hasattr(prod_obj, 'val') else prod_obj
             if not prod:
                 return False
             prod['quantity'] = prod.get('quantity', 0) + quantity
@@ -152,4 +197,16 @@ class InventoryManager:
     def get_category_by_name(self, name: str) -> Optional[Category]:
         """Get category by name."""
         with DatabaseManager().get_session() as session:
-            return session.query(Category).filter(Category.name == name).first() 
+            return session.query(Category).filter(Category.name == name).first()
+
+def filter_to_model(model, data):
+    # Support Pydantic v1 (__fields__), v2 (model_fields), or fallback to __annotations__
+    if hasattr(model, 'model_fields'):
+        allowed = set(model.model_fields.keys())
+    elif hasattr(model, '__fields__'):
+        allowed = set(model.__fields__.keys())
+    elif hasattr(model, '__annotations__'):
+        allowed = set(model.__annotations__.keys())
+    else:
+        allowed = set()
+    return {k: v for k, v in data.items() if k in allowed} 

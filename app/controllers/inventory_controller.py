@@ -86,7 +86,7 @@ class InventoryController:
     def count_total_stock(self):
         try:
             products = self.manager.list_products()
-            return sum(getattr(p, 'quantity', getattr(p, 'stock', 0)) for p in products)
+            return sum((getattr(p, 'quantity', getattr(p, 'stock', 0)) or 0) for p in products)
         except Exception as e:
             logger.error(f"Error counting total stock: {e}")
             return 0
@@ -94,7 +94,7 @@ class InventoryController:
     def count_low_stock(self, threshold=10):
         try:
             products = self.manager.list_products()
-            return sum(1 for p in products if getattr(p, 'quantity', getattr(p, 'stock', 0)) < threshold)
+            return sum(1 for p in products if (getattr(p, 'quantity', getattr(p, 'stock', 0)) or 0) < threshold)
         except Exception as e:
             logger.error(f"Error counting low stock: {e}")
             return 0
@@ -160,12 +160,17 @@ class InventoryController:
                 writer.writerow(headers)
                 count = 0
                 for p in products:
+                    quantity = getattr(p, 'quantity', getattr(p, 'stock', 0))
+                    try:
+                        quantity = int(quantity) if quantity not in (None, "") else 0
+                    except (ValueError, TypeError):
+                        quantity = 0
                     row = [
                         getattr(p, 'id', getattr(p, 'item_id', '')),
                         getattr(p, 'name', ''),
                         getattr(p, 'details', getattr(p, 'description', '')),
                         getattr(p, 'category', 'Other'),
-                        getattr(p, 'quantity', getattr(p, 'stock', 0)),
+                        quantity,
                         getattr(p, 'buying_price', getattr(p, 'cost_price', 0.0)),
                         getattr(p, 'selling_price', 0.0)
                     ]
@@ -183,81 +188,63 @@ class InventoryController:
 
     def count_medium_stock(self, min_threshold=11, max_threshold=50):
         """Counts items with stock between the specified thresholds."""
-        # Try to get from cache first
         cache_key = f"inventory:medium_stock:{min_threshold}_{max_threshold}"
         cached_value = global_cache.get(cache_key)
         if cached_value is not None:
             return cached_value
-            
-        # If not in cache, calculate from database
         medium = 0
         for row in range(self.model.rowCount()):
             stock = self.model.data(self.model.index(row, 4))
-            if stock:
-                try:
-                    stock_value = int(stock)
-                    if min_threshold <= stock_value <= max_threshold:
-                        medium += 1
-                except ValueError:
-                    print(f"Warning: Invalid stock at row {row}: {stock}")
-        
-        # Store in cache for 5 minutes
+            try:
+                stock_value = int(stock) if stock not in (None, "") else 0
+                if min_threshold <= stock_value <= max_threshold:
+                    medium += 1
+            except (ValueError, TypeError):
+                print(f"Warning: Invalid stock at row {row}: {stock}")
         global_cache.set(cache_key, medium, ttl_seconds=300)
         return medium
 
     def count_high_stock(self, threshold=50):
         """Counts items with stock above the specified threshold."""
-        # Try to get from cache first
         cache_key = f"inventory:high_stock:{threshold}"
         cached_value = global_cache.get(cache_key)
         if cached_value is not None:
             return cached_value
-            
-        # If not in cache, calculate from database
         high = 0
         for row in range(self.model.rowCount()):
             stock = self.model.data(self.model.index(row, 4))
-            if stock:
-                try:
-                    if int(stock) > threshold:
-                        high += 1
-                except ValueError:
-                    print(f"Warning: Invalid stock at row {row}: {stock}")
-        
-        # Store in cache for 5 minutes
+            try:
+                stock_value = int(stock) if stock not in (None, "") else 0
+                if stock_value > threshold:
+                    high += 1
+            except (ValueError, TypeError):
+                print(f"Warning: Invalid stock at row {row}: {stock}")
         global_cache.set(cache_key, high, ttl_seconds=300)
         return high
 
     def get_low_stock_items(self, threshold=10):
         """Returns a list of items with stock below the specified threshold."""
-        # Try to get from cache first
         cache_key = f"inventory:low_stock_items:{threshold}"
         cached_value = global_cache.get(cache_key)
         if cached_value is not None:
             return cached_value
-            
-        # If not in cache, calculate from database
         low_stock_items = []
         for row in range(self.model.rowCount()):
             item_id = self.model.data(self.model.index(row, 0))
             name = self.model.data(self.model.index(row, 1))
             stock = self.model.data(self.model.index(row, 4))
             category = self.model.data(self.model.index(row, 3))
-            
-            if stock:
-                try:
-                    stock_value = int(stock)
-                    if stock_value < threshold:
-                        low_stock_items.append({
-                            'id': item_id,
-                            'name': name,
-                            'stock': stock_value,
-                            'category': category
-                        })
-                except ValueError:
-                    print(f"Warning: Invalid stock at row {row}: {stock}")
-        
-        # Store in cache for 5 minutes
+            try:
+                stock_value = int(stock) if stock not in (None, "") else 0
+                if stock_value < threshold:
+                    low_stock_items.append({
+                        'id': item_id,
+                        'name': name,
+                        'stock': stock_value,
+                        'category': category
+                    })
+            except (ValueError, TypeError):
+                print(f"Warning: Invalid stock at row {row}: {stock}")
         global_cache.set(cache_key, low_stock_items, ttl_seconds=300)
         return low_stock_items
 

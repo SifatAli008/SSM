@@ -27,7 +27,8 @@ class ReportManager:
     def generate_sales_report(self, start_date: datetime, end_date: datetime, format: str = 'pdf') -> Optional[str]:
         """Generate sales report for a date range from Firebase."""
         try:
-            sales_data = get_db().child('sales').get().val() or {}
+            sales_data_obj = get_db().child('sales').get()
+            sales_data = sales_data_obj.val() if hasattr(sales_data_obj, 'val') else sales_data_obj or {}
             sales = []
             for v in sales_data.values():
                 sale_date = pd.to_datetime(v.get('sale_date'))
@@ -46,7 +47,8 @@ class ReportManager:
     def generate_inventory_report(self, format: str = 'pdf') -> Optional[str]:
         """Generate inventory status report from Firebase."""
         try:
-            inventory_data = get_db().child('inventory').get().val() or {}
+            inventory_data_obj = get_db().child('inventory').get()
+            inventory_data = inventory_data_obj.val() if hasattr(inventory_data_obj, 'val') else inventory_data_obj or {}
             inventory = list(inventory_data.values())
             if not inventory:
                 logger.warning("No inventory data found")

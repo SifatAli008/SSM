@@ -10,7 +10,7 @@ Base = declarative_base()
 class BaseModel(PydanticBaseModel):
     """Base Pydantic model for all models."""
     class Config:
-        orm_mode = True
+        from_attributes = True
         arbitrary_types_allowed = True
 
 class User(Base):

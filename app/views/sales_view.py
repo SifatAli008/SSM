@@ -288,49 +288,74 @@ class SalesView(QWidget):
         card.layout.addWidget(self.subtotal_label)
         card.layout.addWidget(self.tax_label)
         card.layout.addWidget(self.total_label)
+        # Discount
+        discount_row = QHBoxLayout()
+        discount_label = QLabel("Discount:")
+        discount_label.setFont(QFont(ThemeManager.FONTS["family"], 12))
+        self.discount_input = QDoubleSpinBox()
+        self.discount_input.setMaximum(1e6)
+        self.discount_input.setMinimum(0)
+        self.discount_input.setValue(0)
+        self.discount_input.setPrefix("$")
+        self.discount_input.setMinimumHeight(32)
+        self.discount_input.valueChanged.connect(self.update_summary)
+        self.discount_input.valueChanged.connect(self._update_complete_btn_state)
+        discount_row.addWidget(discount_label)
+        discount_row.addWidget(self.discount_input)
+        card.layout.addLayout(discount_row)
         # Payment method
         pm_label = QLabel("Payment Method")
         pm_label.setFont(QFont(ThemeManager.FONTS["family"], 12, QFont.Bold))
         card.layout.addWidget(pm_label)
         pm_row = QHBoxLayout()
         self.cash_btn = Button("\U0001F4B0 Cash", variant="primary")
-        self.card_btn = Button("\U0001F4B3 Card", variant="secondary")
         self.cash_btn.setCheckable(True)
-        self.card_btn.setCheckable(True)
         self.cash_btn.setChecked(True)
-        self.cash_btn.clicked.connect(lambda: self.set_payment_method('cash'))
-        self.card_btn.clicked.connect(lambda: self.set_payment_method('card'))
+        self.cash_btn.clicked.connect(self._update_complete_btn_state)
         pm_row.addWidget(self.cash_btn)
-        pm_row.addWidget(self.card_btn)
         card.layout.addLayout(pm_row)
         # Amount paid
         self.amount_paid_input = QLineEdit()
         self.amount_paid_input.setPlaceholderText("Enter amount paid")
+        self.amount_paid_input.textChanged.connect(self._update_complete_btn_state)
         card.layout.addWidget(self.amount_paid_input)
         # Complete sale
         self.complete_btn = Button("\U0001F4C4 Complete Sale", variant="primary")
         self.complete_btn.setEnabled(False)
+        self.complete_btn.clicked.connect(self._on_complete_sale)
         card.layout.addWidget(self.complete_btn)
         # Print receipt
         self.print_btn = Button("\U0001F5B6 Print Receipt", variant="secondary")
         card.layout.addWidget(self.print_btn)
         return card
 
+    def _update_complete_btn_state(self):
+        try:
+            total = self._get_total()
+            paid = float(self.amount_paid_input.text()) if self.amount_paid_input.text() else 0
+            enabled = self.cash_btn.isChecked() and total > 0 and paid >= total
+            self.complete_btn.setEnabled(enabled)
+        except Exception:
+            self.complete_btn.setEnabled(False)
+
+    def _get_total(self):
+        subtotal = sum(item['price'] * item['qty'] for item in self.cart)
+        tax = subtotal * 0.10
+        discount = self.discount_input.value() if hasattr(self, 'discount_input') else 0
+        return max(subtotal + tax - discount, 0)
+
+    def _on_complete_sale(self):
+        # Here you would trigger the sale completion logic
+        QMessageBox.information(self, "Sale Completed", "The sale has been completed successfully!")
+
     def update_summary(self):
         subtotal = sum(item['price'] * item['qty'] for item in self.cart)
         tax = subtotal * 0.10
-        total = subtotal + tax
+        discount = self.discount_input.value() if hasattr(self, 'discount_input') else 0
+        total = max(subtotal + tax - discount, 0)
         self.subtotal_label.setText(f"Subtotal: <b>${subtotal:.2f}</b>")
         self.tax_label.setText(f"Tax (10%): <b>${tax:.2f}</b>")
         self.total_label.setText(f"Total: <span style='font-size:18px; color:#222;'><b>${total:.2f}</b></span>")
-
-    def set_payment_method(self, method):
-        if method == 'cash':
-            self.cash_btn.setChecked(True)
-            self.card_btn.setChecked(False)
-        else:
-            self.cash_btn.setChecked(False)
-            self.card_btn.setChecked(True)
 
     def refresh_table(self):
         # Dummy data for demonstration; replace with controller/model call
