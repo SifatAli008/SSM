@@ -15,6 +15,9 @@ from app.views.widgets.card_widget import CardWidget
 from app.views.widgets.action_button import ActionButton
 from app.core.sales import SalesManager
 from app.utils.ui_helpers import show_error
+from app.utils.logger import Logger
+
+logger = Logger()
 
 class SaleDialog(QDialog):
     def __init__(self, parent=None, sale=None):
@@ -459,7 +462,10 @@ class SalesView(QWidget):
                 # Refresh the table with the new data
                 self.refresh_table()
                 
+                logger.info(f"[Sales] Added sale for customer: {data['customer']}, total: ${data['total']:.2f}, status: {data['status']}")
+                
             except Exception as e:
+                logger.error(f"[Sales] Failed to process sale: {str(e)}")
                 show_error(self, f"Failed to process sale: {str(e)}")
     
     def print_receipt(self, sale_data):
@@ -485,16 +491,18 @@ class SalesView(QWidget):
         dialog = SaleDialog(self, sale)
         if dialog.exec_():
             data = dialog.get_data()
+            logger.info(f"[Sales] Edited sale for customer: {data['customer']}, total: ${data['total']:.2f}, status: {data['status']}")
             # TODO: Update in model/controller
             QMessageBox.information(self, "Sale Updated", f"Sale for {data['customer']} updated.")
             self.refresh_table()
 
     def delete_sale(self):
         if self.selected_row is None:
-            QMessageBox.warning(self, "No Selection", "Select a sale to delete.")
+            show_error(self, "Select a sale to delete.", title="No Selection")
             return
         customer = self.table.item(self.selected_row, 2).text()
         if QMessageBox.question(self, "Delete Sale", f"Delete sale for {customer}?", QMessageBox.Yes|QMessageBox.No) == QMessageBox.Yes:
+            logger.info(f"[Sales] Deleted sale for customer: {customer}")
             # TODO: Delete from model/controller
             QMessageBox.information(self, "Sale Deleted", f"Sale for {customer} deleted.")
             self.refresh_table()
