@@ -1,8 +1,10 @@
 from app.utils.database import DatabaseManager
 from app.utils.pdf_generator import PDFGenerator
-from app.utils.logger import logger
+from app.utils.logger import Logger
 from datetime import datetime, timedelta
 import os
+
+logger = Logger()
 
 class ReportsController:
     """
@@ -28,58 +30,71 @@ class ReportsController:
             dict: Sales summary data including total sales, profit, number of orders, etc.
         """
         try:
-            end_date = datetime.now()
-            
-            if period == "today":
-                start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
-            elif period == "last_7_days":
-                start_date = end_date - timedelta(days=7)
-            elif period == "last_30_days":
-                start_date = end_date - timedelta(days=30)
-            elif period == "this_month":
-                start_date = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            elif period == "this_year":
-                start_date = end_date.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-            else:
-                # Default to last 30 days
-                start_date = end_date - timedelta(days=30)
+            # If using SQL
+            if hasattr(self.db, 'execute_query'):
+                end_date = datetime.now()
                 
-            # Convert to string format for SQLite
-            start_date_str = start_date.strftime("%Y-%m-%d %H:%M:%S")
-            end_date_str = end_date.strftime("%Y-%m-%d %H:%M:%S")
-            
-            # Get sales data from database
-            query = """
-                SELECT 
-                    SUM(total_amount) as total_sales, 
-                    COUNT(*) as total_orders,
-                    AVG(total_amount) as average_order_value
-                FROM sales
-                WHERE sale_date BETWEEN ? AND ?
-            """
-            
-            sales_data = self.db.execute_query(query, (start_date_str, end_date_str))
-            
-            if not sales_data or not sales_data[0][0]:
-                # No sales data found for the period
+                if period == "today":
+                    start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                elif period == "last_7_days":
+                    start_date = end_date - timedelta(days=7)
+                elif period == "last_30_days":
+                    start_date = end_date - timedelta(days=30)
+                elif period == "this_month":
+                    start_date = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                elif period == "this_year":
+                    start_date = end_date.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+                else:
+                    # Default to last 30 days
+                    start_date = end_date - timedelta(days=30)
+                    
+                # Convert to string format for SQLite
+                start_date_str = start_date.strftime("%Y-%m-%d %H:%M:%S")
+                end_date_str = end_date.strftime("%Y-%m-%d %H:%M:%S")
+                
+                # Get sales data from database
+                query = """
+                    SELECT 
+                        SUM(total_amount) as total_sales, 
+                        COUNT(*) as total_orders,
+                        AVG(total_amount) as average_order_value
+                    FROM sales
+                    WHERE sale_date BETWEEN ? AND ?
+                """
+                
+                sales_data = self.db.execute_query(query, (start_date_str, end_date_str))
+                
+                if not sales_data or not sales_data[0][0]:
+                    # No sales data found for the period
+                    return {
+                        "total_sales": 0,
+                        "total_orders": 0,
+                        "average_order": 0,
+                        "period": period
+                    }
+                    
+                # Process data
+                total_sales = float(sales_data[0][0])
+                total_orders = int(sales_data[0][1])
+                average_order = float(sales_data[0][2]) if sales_data[0][2] else 0
+                
                 return {
-                    "total_sales": 0,
-                    "total_orders": 0,
-                    "average_order": 0,
+                    "total_sales": total_sales,
+                    "total_orders": total_orders,
+                    "average_order": average_order,
                     "period": period
                 }
-                
-            # Process data
-            total_sales = float(sales_data[0][0])
-            total_orders = int(sales_data[0][1])
-            average_order = float(sales_data[0][2]) if sales_data[0][2] else 0
-            
-            return {
-                "total_sales": total_sales,
-                "total_orders": total_orders,
-                "average_order": average_order,
-                "period": period
-            }
+            # If using Firebase
+            else:
+                from app.core.sales import SalesManager
+                sales_manager = SalesManager(None)
+                summary = sales_manager.get_sales_summary()
+                return {
+                    "total_sales": summary.get("total_revenue", 0),
+                    "total_orders": summary.get("total_sales", 0),
+                    "average_order": summary.get("average_sale", 0),
+                    "period": period
+                }
             
         except Exception as e:
             logger.error(f"Error getting sales summary: {str(e)}")
@@ -99,34 +114,46 @@ class ReportsController:
             dict: Inventory summary including total value, total items, low stock items
         """
         try:
-            # Get inventory data
-            query = """
-                SELECT 
-                    COUNT(*) as total_items,
-                    SUM(stock * buying_price) as total_value,
-                    SUM(CASE WHEN stock < 5 THEN 1 ELSE 0 END) as low_stock_items
-                FROM inventory
-            """
-            
-            inventory_data = self.db.execute_query(query)
-            
-            if not inventory_data:
-                return {
-                    "total_value": 0,
-                    "total_items": 0,
-                    "low_stock_items": 0
-                }
+            # If using SQL
+            if hasattr(self.db, 'execute_query'):
+                query = """
+                    SELECT 
+                        COUNT(*) as total_items,
+                        SUM(stock * buying_price) as total_value,
+                        SUM(CASE WHEN stock < 5 THEN 1 ELSE 0 END) as low_stock_items
+                    FROM inventory
+                """
+                inventory_data = self.db.execute_query(query)
                 
-            # Process data
-            total_items = int(inventory_data[0][0])
-            total_value = float(inventory_data[0][1]) if inventory_data[0][1] else 0
-            low_stock_items = int(inventory_data[0][2])
-            
-            return {
-                "total_value": total_value,
-                "total_items": total_items,
-                "low_stock_items": low_stock_items
-            }
+                if not inventory_data:
+                    return {
+                        "total_value": 0,
+                        "total_items": 0,
+                        "low_stock_items": 0
+                    }
+                    
+                # Process data
+                total_items = int(inventory_data[0][0])
+                total_value = float(inventory_data[0][1]) if inventory_data[0][1] else 0
+                low_stock_items = int(inventory_data[0][2])
+                
+                return {
+                    "total_value": total_value,
+                    "total_items": total_items,
+                    "low_stock_items": low_stock_items
+                }
+            # If using Firebase
+            else:
+                from app.models.inventory import InventoryItem
+                items = InventoryItem.get_all_items()
+                total_value = sum((getattr(i, 'quantity', getattr(i, 'stock', 0)) or 0) * (getattr(i, 'buying_price', getattr(i, 'cost_price', 0.0)) or 0.0) for i in items)
+                total_items = len(items)
+                low_stock_items = sum(1 for i in items if (getattr(i, 'quantity', getattr(i, 'stock', 0)) or 0) < 5)
+                return {
+                    "total_value": total_value,
+                    "total_items": total_items,
+                    "low_stock_items": low_stock_items
+                }
             
         except Exception as e:
             logger.error(f"Error getting inventory value: {str(e)}")
@@ -335,17 +362,34 @@ class ReportsController:
     def get_sales_by_category(self):
         """Return sales by category as (labels, values)"""
         try:
-            # Join sales with inventory to get category
-            query = """
-                SELECT i.category, SUM(s.total_amount)
-                FROM sales s
-                LEFT JOIN inventory i ON s.inventory_id = i.id
-                GROUP BY i.category
-            """
-            result = self.db.execute_query(query)
-            labels = [row[0] if row[0] is not None else 'Unknown' for row in result]
-            values = [float(row[1]) for row in result]
-            return labels, values
+            # If using SQL
+            if hasattr(self.db, 'execute_query'):
+                query = """
+                    SELECT i.category, SUM(s.total_amount)
+                    FROM sales s
+                    LEFT JOIN inventory i ON s.inventory_id = i.id
+                    GROUP BY i.category
+                """
+                result = self.db.execute_query(query)
+                labels = [row[0] if row[0] is not None else 'Unknown' for row in result]
+                values = [float(row[1]) for row in result]
+                return labels, values
+            # If using Firebase
+            else:
+                from app.core.sales import SalesManager
+                from app.models.inventory import InventoryItem
+                sales_manager = SalesManager(None)
+                sales = sales_manager.list_sales()
+                products = {getattr(p, 'id', getattr(p, 'item_id', None)): p for p in InventoryItem.get_all_items()}
+                from collections import defaultdict
+                cat_totals = defaultdict(float)
+                for s in sales:
+                    prod = products.get(getattr(s, 'inventory_id', None))
+                    cat = getattr(prod, 'category', 'Unknown') if prod else 'Unknown'
+                    cat_totals[cat] += getattr(s, 'total_amount', 0.0)
+                labels = list(cat_totals.keys())
+                values = [cat_totals[k] for k in labels]
+                return labels, values
         except Exception as e:
             logger.error(f"Error getting sales by category: {str(e)}")
             return ["Unknown"], [0]
@@ -374,28 +418,59 @@ class ReportsController:
     def get_inventory_by_category(self):
         """Return inventory stats per category: name, value, low, out, in, count"""
         try:
-            query = """
-                SELECT category,
-                       SUM(stock * buying_price) as total_value,
-                       SUM(CASE WHEN stock < 5 AND stock > 0 THEN 1 ELSE 0 END) as low_stock,
-                       SUM(CASE WHEN stock = 0 THEN 1 ELSE 0 END) as out_stock,
-                       SUM(CASE WHEN stock >= 5 THEN 1 ELSE 0 END) as in_stock,
-                       COUNT(*) as item_count
-                FROM inventory
-                GROUP BY category
-            """
-            result = self.db.execute_query(query)
-            categories = []
-            for row in result:
-                categories.append({
-                    "name": row[0],
-                    "value": f"${row[1]:,.2f}",
-                    "low": int(row[2]),
-                    "out": int(row[3]),
-                    "in": int(row[4]),
-                    "count": int(row[5])
-                })
-            return categories
+            # If using SQL
+            if hasattr(self.db, 'execute_query'):
+                query = """
+                    SELECT category,
+                           SUM(stock * buying_price) as total_value,
+                           SUM(CASE WHEN stock < 5 AND stock > 0 THEN 1 ELSE 0 END) as low_stock,
+                           SUM(CASE WHEN stock = 0 THEN 1 ELSE 0 END) as out_stock,
+                           SUM(CASE WHEN stock >= 5 THEN 1 ELSE 0 END) as in_stock,
+                           COUNT(*) as item_count
+                    FROM inventory
+                    GROUP BY category
+                """
+                result = self.db.execute_query(query)
+                categories = []
+                for row in result:
+                    categories.append({
+                        "name": row[0],
+                        "value": f"${row[1]:,.2f}",
+                        "low": int(row[2]),
+                        "out": int(row[3]),
+                        "in": int(row[4]),
+                        "count": int(row[5])
+                    })
+                return categories
+            # If using Firebase
+            else:
+                from app.models.inventory import InventoryItem
+                from collections import defaultdict
+                items = InventoryItem.get_all_items()
+                cat_stats = defaultdict(lambda: {'value': 0, 'low': 0, 'out': 0, 'in': 0, 'count': 0})
+                for p in items:
+                    cat = getattr(p, 'category', 'Other')
+                    stock = getattr(p, 'quantity', getattr(p, 'stock', 0)) or 0
+                    buying_price = getattr(p, 'buying_price', getattr(p, 'cost_price', 0.0)) or 0.0
+                    cat_stats[cat]['value'] += stock * buying_price
+                    cat_stats[cat]['count'] += 1
+                    if stock == 0:
+                        cat_stats[cat]['out'] += 1
+                    elif stock < 5:
+                        cat_stats[cat]['low'] += 1
+                    else:
+                        cat_stats[cat]['in'] += 1
+                categories = []
+                for cat, stats in cat_stats.items():
+                    categories.append({
+                        "name": cat,
+                        "value": f"${stats['value']:,.2f}",
+                        "low": stats['low'],
+                        "out": stats['out'],
+                        "in": stats['in'],
+                        "count": stats['count']
+                    })
+                return categories
         except Exception as e:
             logger.error(f"Error getting inventory by category: {str(e)}")
             return []
