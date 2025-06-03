@@ -130,6 +130,34 @@ class ChartWidget(QWidget):
 
     def _draw_bar_chart(self, painter, margin_left, chart_width, chart_height, min_val, range_val, margin_top, margin_bottom, data_values):
         n = len(data_values)
+        if n == 0:
+            return  # Nothing to draw
+        if n == 1:
+            bar_width = chart_width / 2
+            bar_color = QColor('#6c5ce7')
+            value = data_values[0]
+            x = margin_left + chart_width / 2 - bar_width / 2
+            y = self.height() - margin_bottom - ((value - min_val) * chart_height / range_val)
+            bar_height = self.height() - margin_bottom - y
+            painter.setPen(Qt.NoPen)
+            shadow_color = QColor(bar_color)
+            shadow_color.setAlpha(50)
+            painter.setBrush(QBrush(shadow_color))
+            painter.drawRoundedRect(QRectF(x+2, y+8, bar_width, bar_height), 6, 6)
+            grad = QLinearGradient(x, y, x, y+bar_height)
+            grad.setColorAt(0, bar_color.lighter(120))
+            grad.setColorAt(1, bar_color.darker(120))
+            painter.setBrush(QBrush(grad))
+            painter.drawRoundedRect(QRectF(x, y, bar_width, bar_height), 6, 6)
+            label_y = y - 24 if y - 24 > margin_top + 2 else y + 22
+            font = QFont('Segoe UI', 10, QFont.Bold)
+            painter.setFont(font)
+            outline_pen = QPen(QColor('#fff'), 4)
+            painter.setPen(outline_pen)
+            painter.drawText(QRectF(x, label_y, bar_width, 20), Qt.AlignCenter, f'{value:.0f}')
+            painter.setPen(QPen(QColor('#222'), 1))
+            painter.drawText(QRectF(x, label_y, bar_width, 20), Qt.AlignCenter, f'{value:.0f}')
+            return
         bar_width = chart_width / (n * 1.5)
         bar_color = QColor('#6c5ce7')  # Vibrant purple
         for i, value in enumerate(data_values):
