@@ -150,6 +150,26 @@ For more detailed documentation about specific components:
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## Database Initialization (SQLAlchemy-based)
+
+- The project now uses a robust, future-proof SQLAlchemy-based database initialization script (`config/init_db.py`).
+- All tables are auto-detected from `app/models/base.py` and created automatically.
+- Sample data is inserted using the ORM for categories, products, users, and sales.
+- No raw SQL is used for schema—everything is managed in Python code.
+
+### Adding New Models
+1. Define your new SQLAlchemy model in `app/models/base.py` (subclass `Base`).
+2. Run:
+   ```bash
+   python config/init_db.py
+   ```
+   This will drop and recreate all tables, including your new model.
+
+### Benefits
+- **Auto-detects all models:** No need to manually update SQL for new tables.
+- **Robust and maintainable:** Schema is managed in one place.
+- **Easy to extend:** Just add a model and rerun the script.
+
 ---
 
 For more, see the [GitHub repository](https://github.com/SifatAli008/SSM)
