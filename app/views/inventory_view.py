@@ -941,17 +941,17 @@ class InventoryView(QWidget):
         logger.info("Refreshing inventory data...")
         if self.controller:
             # Refresh the model data
-            self.controller.model.select()
-            
+            if hasattr(self.controller.model, 'refresh'):
+                self.controller.model.refresh()
+            elif hasattr(self.controller.model, 'select'):
+                self.controller.model.select()
             # Update summary cards
             self.refresh_from_controller()
-            
             # If a filter is active, reapply it
             if hasattr(self, 'filter_text') and self.filter_text.text():
                 self.apply_filters()
         else:
             logger.warning("⚠️ No controller available for refresh")
-            
         return True
 
     # Add keyboard shortcuts
