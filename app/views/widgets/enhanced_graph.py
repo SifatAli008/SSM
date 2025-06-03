@@ -203,11 +203,18 @@ class ChartWidget(QWidget):
         painter.setPen(QPen(QColor('#333'), 1))
         painter.setFont(QFont('Segoe UI', 9, QFont.Bold))
         n = len(self.labels)
+        if n == 0:
+            return  # Nothing to draw
         # Draw x-axis labels
-        for i, label in enumerate(self.labels):
-            x = margin_left + (i * chart_width / (n - 1))
+        if n == 1:
+            x = margin_left + chart_width / 2
             y = self.height() - margin_bottom + 24
-            painter.drawText(QRectF(x - 30, y, 60, 20), Qt.AlignCenter, str(label))
+            painter.drawText(QRectF(x - 30, y, 60, 20), Qt.AlignCenter, str(self.labels[0]))
+        else:
+            for i, label in enumerate(self.labels):
+                x = margin_left + (i * chart_width / (n - 1))
+                y = self.height() - margin_bottom + 24
+                painter.drawText(QRectF(x - 30, y, 60, 20), Qt.AlignCenter, str(label))
         # Draw y-axis labels
         for i in range(5):
             y = self.height() - margin_bottom - (i * chart_height / 4)
