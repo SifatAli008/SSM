@@ -1,48 +1,42 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.pyo
+*.pyd
 *.so
-.Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-*.egg-info/
-.installed.cfg
 *.egg
+*.egg-info/
+dist/
+build/
 
-# Firebase API Keys
+# Virtual environments
+venv/
+ENV/
+.env
+
+# SQLite and data
+*.sqlite3
+data/shop.db
+data/*.db
+
+# Logs and cache
+*.log
+logs/
+backups/
+.pytest_cache/
+
+# Firebase/Secrets
 config/firebase_key.json
-*firebase_key*.json
 
-# IDE
+# OS/IDE files
+.DS_Store
 .idea/
 .vscode/
 *.swp
-*.swo
 
-# Logs
-logs/
-*.log
+# Reports
+reports/
 
-# Database
-*.db
-*.sqlite3
-
-# OS specific
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Misc
+*.bak
+*.tmp
