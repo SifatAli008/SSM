@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt, QDate, QTime
 from PyQt5.QtGui import QFont, QColor, QIcon
 from app.views.widgets.card_widget import CardWidget
 from app.views.widgets.action_button import ActionButton
+from app.utils.ui_helpers import show_error
 
 class CustomerDialog(QDialog):
     def __init__(self, parent=None, customer=None):
@@ -805,7 +806,7 @@ class CustomerView(QWidget):
 
     def edit_customer(self):
         if self.selected_row is None:
-            QMessageBox.warning(self, "No Selection", "Select a customer to edit.")
+            show_error(self, "Select a customer to edit.", title="No Selection")
             return
             
         # Get data from table
@@ -824,7 +825,7 @@ class CustomerView(QWidget):
 
     def delete_customer(self):
         if self.selected_row is None:
-            QMessageBox.warning(self, "No Selection", "Select a customer to delete.")
+            show_error(self, "Select a customer to delete.", title="No Selection")
             return
             
         name = self.table.item(self.selected_row, 1).text()
@@ -844,7 +845,7 @@ class CustomerView(QWidget):
     
     def edit_billing(self):
         if self.selected_row is None:
-            QMessageBox.warning(self, "No Selection", "Select a billing record to edit.")
+            show_error(self, "Select a billing record to edit.", title="No Selection")
             return
             
         # Create customer info dictionary from selected row
@@ -863,7 +864,7 @@ class CustomerView(QWidget):
     def perch_invoice(self):
         # Check if fields are filled
         if not self.invoice_name.text() or not self.invoice_total.text():
-            QMessageBox.warning(self, "Incomplete Information", "Please fill in all required fields.")
+            show_error(self, "Please fill in all required fields.", title="Incomplete Information")
             return
             
         # Create invoice data

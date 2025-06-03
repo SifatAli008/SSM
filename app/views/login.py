@@ -11,6 +11,7 @@ from app.controllers.auth_controller import AuthController
 from app.views.main_window import MainWindow
 from app.views.widgets.components import Button, Card
 from app.utils.theme_manager import ThemeManager, ThemeType
+from app.utils.ui_helpers import show_error
 
 
 class LoginWindow(QWidget):
@@ -220,10 +221,10 @@ class LoginWindow(QWidget):
         role = self.get_selected_role()
 
         if not username:
-            QMessageBox.warning(self, "Input Error", "Please enter your username")
+            show_error(self, "Please enter your username", title="Input Error")
             return
         if not password:
-            QMessageBox.warning(self, "Input Error", "Please enter your password")
+            show_error(self, "Please enter your password", title="Input Error")
             return
 
         self.login_button.setText("Signing in...")
@@ -237,9 +238,9 @@ class LoginWindow(QWidget):
                                         f"Welcome {user.full_name}!\nAccessing {role.capitalize()} Dashboard")
                 self.open_appropriate_window(user)
             else:
-                QMessageBox.warning(self, "Login Failed", "Invalid username or password for selected role.")
+                show_error(self, "Invalid username or password for selected role.", title="Login Failed")
         except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
+            show_error(self, str(e))
 
         self.login_button.setText("LOGIN")
         self.login_button.setEnabled(True)
@@ -261,7 +262,7 @@ class LoginWindow(QWidget):
     def reset_password(self):
         username = self.username_input.text().strip()
         if not username:
-            QMessageBox.warning(self, 'Reset Password', 'Enter your username first')
+            show_error(self, 'Enter your username first', title='Reset Password')
             return
         QMessageBox.information(self, 'Reset Link',
                                 f'A reset link has been sent to the email linked to {username}.')

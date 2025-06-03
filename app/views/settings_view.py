@@ -20,6 +20,7 @@ from app.views.widgets.components import PageHeader, Card, Button, ComboBox
 from app.views.widgets.layouts import SplitLayout, PageLayout
 from app.utils.theme_manager import ThemeManager, ThemeType
 from app.controllers.user_controller import UserController
+from app.utils.ui_helpers import show_error
 
 import os
 import sys
@@ -178,7 +179,7 @@ class ThemeSelector(QWidget):
             if success:
                 QMessageBox.information(self, "Theme Saved", "Custom theme was saved successfully.")
             else:
-                QMessageBox.warning(self, "Save Failed", "Could not save the custom theme.")
+                show_error(self, "Could not save the custom theme.", title="Save Failed")
 
 class SettingsView(QWidget):
     """Dedicated settings page for application configuration"""
@@ -193,10 +194,12 @@ class SettingsView(QWidget):
         self.username_input = QLineEdit()
         self.password_input = QLineEdit()
         self.role_combo = QComboBox()
+        self.role_combo.addItems(["admin", "user"])
         self.create_user_button = QPushButton()
         self.save_settings_button = QPushButton()
         self.current_theme = "Dark"
         self.current_language = "English"
+        self.create_user_button.clicked.connect(self._on_create_user)
         self.init_ui()
         self.load_settings()
     
@@ -580,7 +583,7 @@ class SettingsView(QWidget):
                 self.parent_window.show_alert("Settings saved successfully! Some changes may require restarting the application.", "success")
                 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to save settings: {str(e)}")
+            show_error(self, f"Failed to save settings: {str(e)}")
     
     def reset_settings(self):
         """Reset all settings to defaults"""
@@ -627,3 +630,9 @@ class SettingsView(QWidget):
             "Backup Started",
             f"Backup process started to directory:\n{self.backup_path.text()}\n\nThis may take a few moments."
         )
+
+    def _on_create_user(self):
+        username = self.username_input.text()
+        password = self.password_input.text()
+        role = self.role_combo.currentText()
+        self.controller.create_user(username, password, role)

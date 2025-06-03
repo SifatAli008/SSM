@@ -14,6 +14,7 @@ from app.views.widgets.components import Card, Button, TableComponent
 from app.views.widgets.card_widget import CardWidget
 from app.views.widgets.action_button import ActionButton
 from app.core.sales import SalesManager
+from app.utils.ui_helpers import show_error
 
 class SaleDialog(QDialog):
     def __init__(self, parent=None, sale=None):
@@ -96,13 +97,6 @@ class SalesView(QWidget):
     def __init__(self, controller=None, parent=None):
         super().__init__(parent)
         self.controller = controller
-        self.cart = []  # List of cart items
-        self.products = [
-            {"name": "iPhone 14 Pro", "price": 999.99, "stock": 15},
-            {"name": "Samsung Galaxy S23", "price": 799.99, "stock": 3},
-            {"name": "Nike Air Max 90", "price": 120.00, "stock": 25},
-            {"name": "MacBook Pro 14\"", "price": 1999.99, "stock": 1},
-        ]
         self.product_search = QLineEdit()
         self.quantity_input = QSpinBox()
         self.add_to_sale_button = QPushButton()
@@ -110,6 +104,14 @@ class SalesView(QWidget):
         self.customer_search = QLineEdit()
         self.selected_customer = type('CustomerObj', (), {})()
         self.selected_customer.name = "Test Customer"
+        self.cart = []
+        self.products = [
+            {"name": "Product A", "price": 10.0, "stock": 20},
+            {"name": "Product B", "price": 15.5, "stock": 10},
+            {"name": "Product C", "price": 7.25, "stock": 50},
+        ]
+        self.add_to_sale_button.clicked.connect(self._on_add_to_sale)
+        self.complete_sale_button.clicked.connect(self._on_complete_sale)
         self.init_ui()
 
     def init_ui(self):
@@ -352,8 +354,10 @@ class SalesView(QWidget):
         return max(subtotal + tax - discount, 0)
 
     def _on_complete_sale(self):
-        # Here you would trigger the sale completion logic
-        QMessageBox.information(self, "Sale Completed", "The sale has been completed successfully!")
+        if self.cart:
+            total = sum(item['price'] * item['qty'] for item in self.cart)
+            self.controller.create_sale(self.cart, 1, total)
+            self.cart = []
 
     def update_summary(self):
         subtotal = sum(item['price'] * item['qty'] for item in self.cart)
@@ -456,7 +460,7 @@ class SalesView(QWidget):
                 self.refresh_table()
                 
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to process sale: {str(e)}")
+                show_error(self, f"Failed to process sale: {str(e)}")
     
     def print_receipt(self, sale_data):
         """Print or preview a receipt"""
@@ -468,7 +472,7 @@ class SalesView(QWidget):
 
     def edit_sale(self):
         if self.selected_row is None:
-            QMessageBox.warning(self, "No Selection", "Select a sale to edit.")
+            show_error(self, "Select a sale to edit.", title="No Selection")
             return
         sale = {
             'customer': self.table.item(self.selected_row, 2).text(),
@@ -582,6 +586,13 @@ class SalesView(QWidget):
             self.update_summary_cards()
             
         return True
+
+    def _on_add_to_sale(self):
+        name = self.product_search.text()
+        quantity = self.quantity_input.value()
+        prod = self.controller.inventory_controller.get_product(name)
+        if prod:
+            self.cart.append({'name': prod.name, 'price': prod.price, 'qty': quantity, 'stock': prod.quantity})
 
 # NOTE: The code you provided was cut off at 'refresh_items_table'.
 # Please provide the rest of the code for a full replacement if needed.

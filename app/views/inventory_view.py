@@ -584,7 +584,7 @@ class InventoryView(QWidget):
 
     def setup_model(self):
         if not self.controller or not hasattr(self.controller, 'model') or self.controller.model is None:
-            QMessageBox.critical(self, "Error", "Inventory controller or model is not available. Please restart the application or contact support.")
+            show_error(self, "Inventory controller or model is not available. Please restart the application or contact support.")
             self.empty_label.setText("Inventory system is unavailable. Please contact support.")
             self.empty_label.setVisible(True)
             self.empty_icon.setVisible(False)
@@ -743,12 +743,12 @@ class InventoryView(QWidget):
                 buying_price = float(dialog.buying_price_input.text())
                 selling_price = float(dialog.selling_price_input.text())
             except ValueError:
-                QMessageBox.warning(self, "Invalid Input", "Please enter valid numbers for quantity and prices.")
+                show_error(self, "Please enter valid numbers for quantity and prices.", title="Invalid Input")
                 return
             product = ProductData(name=name, quantity=stock, price=buying_price, category=category)
             valid, msg = validate_product_data(product)
             if not valid:
-                QMessageBox.warning(self, "Validation Error", msg)
+                show_error(self, msg, title="Validation Error")
                 return
             if self.controller and hasattr(self.controller, 'add_product'):
                 success = self.controller.add_product(
@@ -766,11 +766,11 @@ class InventoryView(QWidget):
                 else:
                     QMessageBox.critical(self, "Error", "Failed to add product. Please try again.")
             else:
-                QMessageBox.warning(self, "Not Implemented", "Add functionality is not available.")
+                show_error(self, "Add functionality is not available.", title="Not Implemented")
 
     def show_edit_dialog(self):
         if self.selected_row < 0:
-            QMessageBox.warning(self, "No Selection", "Please select a product to edit.")
+            show_error(self, "Please select a product to edit.", title="No Selection")
             return
             
         # Get current values from the model using the updated column mapping
@@ -850,12 +850,12 @@ class InventoryView(QWidget):
                 else:
                     QMessageBox.critical(self, "Error", "Failed to update product. Please try again.")
             else:
-                QMessageBox.warning(self, "Not Implemented", "Update functionality is not available.")
+                show_error(self, "Update functionality is not available.", title="Not Implemented")
 
     def delete_products(self):
         selected_indexes = self.table_view.selectionModel().selectedRows()
         if not selected_indexes:
-            QMessageBox.warning(self, "No Selection", "Please select one or more products to delete.")
+            show_error(self, "Please select one or more products to delete.", title="No Selection")
             return
         
         # Gather product names for confirmation
@@ -934,7 +934,7 @@ class InventoryView(QWidget):
             
         except Exception as e:
             logger.error(f"❌ Error clearing filters: {e}")
-            QMessageBox.warning(self, "Error", "Failed to clear filters. Please try again.")
+            show_error(self, "Failed to clear filters. Please try again.")
 
     def refresh_data(self):
         """Refresh all inventory data to ensure real-time updates"""
@@ -1088,7 +1088,7 @@ class InventoryView(QWidget):
         product = ProductData(name=name, quantity=quantity, price=price, category=category)
         valid, msg = validate_product_data(product)
         if not valid:
-            QMessageBox.warning(self, "Validation Error", msg)
+            show_error(self, msg, title="Validation Error")
             return
         prod = self.controller.add_product(**product.__dict__)
         self.product_table.addRow([prod.name, prod.quantity, prod.price, prod.category])
@@ -1314,7 +1314,7 @@ class ProductDialog(QDialog):
     def validate_and_accept(self):
         # Basic validation
         if not self.name_input.text().strip():
-            QMessageBox.warning(self, "Validation Error", "Product name cannot be empty!")
+            show_error(self, "Product name cannot be empty!", title="Validation Error")
             return
             
         qty_text = self.qty_input.text()
@@ -1323,34 +1323,34 @@ class ProductDialog(QDialog):
             if qty_val < 0:
                 raise ValueError
         except Exception:
-            QMessageBox.warning(self, "Validation Error", "Quantity must be a positive integer!")
+            show_error(self, "Quantity must be a positive integer!", title="Validation Error")
             return
             
         if not self.buying_price_input.text() or self.buying_price_input.text().lower() == 'none':
-            QMessageBox.warning(self, "Validation Error", "Buying price must be a positive number!")
+            show_error(self, "Buying price must be a positive number!", title="Validation Error")
             return
         try:
             buying_price_val = float(self.buying_price_input.text())
             if buying_price_val < 0:
                 raise ValueError
         except Exception:
-            QMessageBox.warning(self, "Validation Error", "Buying price must be a positive number!")
+            show_error(self, "Buying price must be a positive number!", title="Validation Error")
             return
             
         if not self.selling_price_input.text() or self.selling_price_input.text().lower() == 'none':
-            QMessageBox.warning(self, "Validation Error", "Selling price must be a positive number!")
+            show_error(self, "Selling price must be a positive number!", title="Validation Error")
             return
         try:
             selling_price_val = float(self.selling_price_input.text())
             if selling_price_val < 0:
                 raise ValueError
         except Exception:
-            QMessageBox.warning(self, "Validation Error", "Selling price must be a positive number!")
+            show_error(self, "Selling price must be a positive number!", title="Validation Error")
             return
             
         # Check if "Add New Category" is selected
         if self.category_input.currentText() == "--- Add New Category ---":
-            QMessageBox.warning(self, "Validation Error", "Please select a valid category or add a new one!")
+            show_error(self, "Please select a valid category or add a new one!", title="Validation Error")
             return
             
         # Validate reorder level
@@ -1359,7 +1359,7 @@ class ProductDialog(QDialog):
             if reorder_level < 0:
                 raise ValueError
         except Exception:
-            QMessageBox.warning(self, "Validation Error", "Reorder level must be a positive integer!")
+            show_error(self, "Reorder level must be a positive integer!", title="Validation Error")
             return
             
         # Validate supplier ID if provided
@@ -1369,7 +1369,7 @@ class ProductDialog(QDialog):
                 if supplier_id < 0:
                     raise ValueError
             except Exception:
-                QMessageBox.warning(self, "Validation Error", "Supplier ID must be a positive integer!")
+                show_error(self, "Supplier ID must be a positive integer!", title="Validation Error")
                 return
                 
         # Validate expiry date format if provided
@@ -1377,7 +1377,7 @@ class ProductDialog(QDialog):
             try:
                 datetime.strptime(self.expiry_date_input.text(), "%Y-%m-%d")
             except ValueError:
-                QMessageBox.warning(self, "Validation Error", "Expiry date must be in YYYY-MM-DD format!")
+                show_error(self, "Expiry date must be in YYYY-MM-DD format!", title="Validation Error")
                 return
             
         self.accept()
