@@ -13,6 +13,7 @@ from datetime import datetime
 from app.views.widgets.snackbar import Snackbar
 from app.core.inventory import InventoryManager
 from app.utils.form_helpers import get_widget_text, ProductData, validate_product_data
+from app.utils.ui_helpers import show_error
 
 logger = Logger()
 
@@ -891,16 +892,15 @@ class InventoryView(QWidget):
             "inventory_export.csv",
             "CSV Files (*.csv)"
         )
-        
         if file_path:
             try:
                 success, count = self.controller.export_inventory_to_csv(file_path)
                 if success:
                     QMessageBox.information(self, "Success", f"Exported {count} products to CSV successfully!")
                 else:
-                    QMessageBox.warning(self, "Export Failed", "Failed to export inventory to CSV.")
+                    show_error(self, "Failed to export inventory to CSV.")
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Export failed: {str(e)}")
+                show_error(self, f"Export failed: {str(e)}")
 
     def apply_filters(self):
         # Ensure proxy_model is initialized
