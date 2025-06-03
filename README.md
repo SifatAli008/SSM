@@ -77,6 +77,13 @@ A comprehensive desktop application for retail store management built with Pytho
 - Performance optimization with data caching
 - Comprehensive test suite
 
+## Automated Testing & UI Test Reliability
+
+- The test suite now includes robust UI tests for all major workflows, including inventory add/edit dialogs.
+- UI tests use a `test_mode` flag and patch modal dialogs (like `ProductDialog`) to simulate user input and auto-accept, ensuring tests are reliable and deterministic.
+- No production code logic is changed for testing—tests patch dialogs at runtime for clean separation.
+- See `tests/test_ui.py` for examples of dialog patching and best practices for PyQt5 UI automation.
+
 ## Getting Started
 
 ### Prerequisites
@@ -123,6 +130,8 @@ Run the automated test suite to ensure everything is working properly:
 ```bash
 python run_tests.py
 ```
+
+All UI and backend tests should pass. If you add new dialogs or UI forms, follow the same patching pattern for reliable automation.
 
 ### Troubleshooting
 - If you see errors about missing packages, make sure your virtual environment is activated before running `pip install` or `python run.py`.
