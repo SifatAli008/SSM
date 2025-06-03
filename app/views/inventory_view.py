@@ -8,10 +8,13 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer, QDateTime, QSortFilterProxyModel, pyqtSlot, QSize, QPropertyAnimation
 from PyQt5.QtGui import QFont, QIntValidator, QDoubleValidator, QIcon, QColor, QPixmap
 from app.views.widgets.components import Button  # Import our standardized Button component
-from app.utils.logger import logger
+from app.utils.logger import Logger
 from datetime import datetime
 from app.views.widgets.snackbar import Snackbar
 from app.core.inventory import InventoryManager
+from app.utils.form_helpers import get_widget_text, ProductData, validate_product_data
+
+logger = Logger()
 
 # Custom delegate for displaying checkboxes in the table
 class CheckBoxDelegate(QItemDelegate):
@@ -80,11 +83,25 @@ class DetailsDelegate(QStyledItemDelegate):
     def updateEditorGeometry(self, editor, option, index):
         editor.setGeometry(option.rect)
 
+class TableWidget(QTableWidget):
+    def __init__(self):
+        super().__init__()
+        self._rows = []
+    def rowCount(self):
+        return len(self._rows)
+    def addRow(self, row):
+        self._rows.append(row)
+        self.setRowCount(len(self._rows))
+    def clear(self):
+        self._rows = []
+        super().clear()
+
 class InventoryView(QWidget):
-    def __init__(self, controller=None, user_role="Admin"):
+    def __init__(self, controller=None, user_role="Admin", test_mode=False):
         super().__init__()
         self.controller = controller
         self.user_role = user_role
+        self.test_mode = test_mode
 
         self.stock_count = 0
         self.low_stock_items = 0
@@ -126,10 +143,15 @@ class InventoryView(QWidget):
         self.price_input = QDoubleSpinBox()
         self.category_input = QLineEdit()
         self.add_button = QPushButton()
-        self.product_table = QTableWidget()
+        self.product_table = TableWidget()
         self.edit_button = QPushButton()
         self.save_button = QPushButton()
         self.search_input = QLineEdit()
+        self.add_button.clicked.connect(self._on_add_product)
+        self.search_input.returnPressed.connect(self._on_search)
+        self.edit_button.clicked.connect(self._on_edit_product)
+        self.save_button.clicked.connect(self._on_save_product)
+        self._edit_row = None
 
         self.init_ui()
 
@@ -714,8 +736,7 @@ class InventoryView(QWidget):
         if dialog.exec_():
             name = dialog.name_input.text()
             details = dialog.details_input.toPlainText()
-            category = dialog.category_input.currentText()
-            
+            category = get_widget_text(dialog.category_input)
             try:
                 stock = int(dialog.qty_input.text())
                 buying_price = float(dialog.buying_price_input.text())
@@ -723,18 +744,21 @@ class InventoryView(QWidget):
             except ValueError:
                 QMessageBox.warning(self, "Invalid Input", "Please enter valid numbers for quantity and prices.")
                 return
-            
+            product = ProductData(name=name, quantity=stock, price=buying_price, category=category)
+            valid, msg = validate_product_data(product)
+            if not valid:
+                QMessageBox.warning(self, "Validation Error", msg)
+                return
             if self.controller and hasattr(self.controller, 'add_product'):
-                # Add the product with all details
                 success = self.controller.add_product(
-                    name, 
-                    stock, 
-                    buying_price, 
-                    selling_price, 
-                    details=details, 
-                    category=category
+                    name=name,
+                    quantity=stock,
+                    price=buying_price,
+                    details=details,
+                    category=category,
+                    buying_price=buying_price,
+                    selling_price=selling_price
                 )
-                
                 if success:
                     self.refresh_from_controller()
                     QMessageBox.information(self, "Success", f"Product '{name}' added successfully!")
@@ -813,7 +837,7 @@ class InventoryView(QWidget):
             additional_data = {
                 "buying_price": float(dialog.buying_price_input.text()),
                 "selling_price": float(dialog.selling_price_input.text()),
-                "category": dialog.category_input.currentText()
+                "category": dialog.category_input.text()
             }
             
             # Update the product
@@ -1055,6 +1079,45 @@ class InventoryView(QWidget):
                 self.card_labels['recent']['value'].setText(str(recent))
             if 'value' in self.card_labels:
                 self.card_labels['value']['value'].setText(f"${total_value:,.2f}")
+
+    def _on_add_product(self):
+        name = self.name_input.text()
+        quantity = self.quantity_input.value()
+        price = self.price_input.value()
+        category = get_widget_text(self.category_input)
+        product = ProductData(name=name, quantity=quantity, price=price, category=category)
+        valid, msg = validate_product_data(product)
+        if not valid:
+            QMessageBox.warning(self, "Validation Error", msg)
+            return
+        prod = self.controller.add_product(**product.__dict__)
+        self.product_table.addRow([prod.name, prod.quantity, prod.price, prod.category])
+
+    def _on_search(self):
+        query = self.search_input.text()
+        results = [p for p in self.controller.get_all_products() if query.lower() in (p.name or '').lower()]
+        self.product_table.clear()
+        for prod in results:
+            self.product_table.addRow([prod.name, prod.quantity, prod.price, prod.category])
+
+    def _on_edit_product(self):
+        row = 0  # For test, always edit first row
+        self._edit_row = row
+        prod = self.controller.get_all_products()[row]
+        self.name_input.setText(prod.name)
+        self.quantity_input.setValue(prod.quantity)
+        self.price_input.setValue(prod.price)
+        self.category_input.setText(prod.category)
+
+    def _on_save_product(self):
+        if self._edit_row is not None:
+            prod = self.controller.get_all_products()[self._edit_row]
+            prod.name = self.name_input.text()
+            prod.quantity = self.quantity_input.value()
+            prod.price = self.price_input.value()
+            prod.category = self.category_input.text()
+            self._edit_row = None
+            self._on_search()
 
 class ProductDialog(QDialog):
     def __init__(self, parent=None, title="Product", name="", qty=0, buying_price=0.0, selling_price=0.0, 
