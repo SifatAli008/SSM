@@ -21,3 +21,7 @@ firebase-admin
 
 # Testing
 pytest==7.4.0
+
+pydantic
+transformers
+python-jose
