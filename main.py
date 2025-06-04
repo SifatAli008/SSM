@@ -12,6 +12,9 @@ from app.core.reports import ReportManager
 from app.core.inventory import InventoryManager
 from app.core.sales import SalesManager
 from app.core.users import UserManager
+from app.data.data_provider import SQLDataProvider, FirebaseDataProvider
+from app.controllers.inventory_controller import InventoryController
+from app.controllers.sales_controller import SalesController
 
 logger = Logger()
 
@@ -43,6 +46,15 @@ class Application:
             # Initialize database first
             self.db_manager = DatabaseManager()
             
+            # Select data provider
+            db_type = config_manager.get('database.type')
+            if db_type == 'firebase':
+                self.data_provider = FirebaseDataProvider()
+                logger.info("Using Firebase backend for data provider.")
+            else:
+                self.data_provider = SQLDataProvider(self.db_manager)
+                logger.info("Using SQLite backend for data provider.")
+            
             # Initialize event system
             self.event_system = EventSystem()
             
@@ -50,8 +62,8 @@ class Application:
             self.auth_manager = AuthManager()
             self.backup_manager = BackupManager(self.event_system)
             self.report_manager = ReportManager()
-            self.inventory_manager = InventoryManager()
-            self.sales_manager = SalesManager()
+            self.inventory_controller = InventoryController(self.data_provider, self.event_system)
+            self.sales_controller = SalesController(self.data_provider)
             self.user_manager = UserManager()
             
             logger.info("All managers initialized successfully")
@@ -67,8 +79,8 @@ class Application:
                 event_system=self.event_system,
                 backup_manager=self.backup_manager,
                 report_manager=self.report_manager,
-                inventory_manager=self.inventory_manager,
-                sales_manager=self.sales_manager,
+                inventory_manager=self.inventory_controller,
+                sales_manager=self.sales_controller,
                 user_manager=self.user_manager
             )
             self.main_window.show()

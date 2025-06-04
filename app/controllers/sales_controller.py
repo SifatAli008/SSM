@@ -1,70 +1,35 @@
 from app.models.sales import SalesModel
 from datetime import datetime
 from app.utils.event_system import global_event_system
+from app.data.data_provider import BaseDataProvider
 
 class SalesController:
     """Business logic for sales operations"""
     
-    def __init__(self, db_conn):
-        self.model = SalesModel(db_conn)
-        self.db = db_conn
+    def __init__(self, data_provider: BaseDataProvider):
+        self.data_provider = data_provider
         self.sales = []
-        from app.controllers.inventory_controller import InventoryController
-        from app.models.customer import Customer
-        self.inventory_controller = InventoryController(db_conn)
-        self.customer_controller = Customer(db_conn)
         self.next_id = 1
         
-    def add_sale(self, **kwargs):
-        """Add a new sale"""
+    def add_sale(self, sale_data):
+        """Add a new sale using the data provider"""
         # Generate invoice number if not provided
-        if 'invoice_number' not in kwargs or not kwargs['invoice_number']:
-            kwargs['invoice_number'] = self.model.generate_invoice_number()
-            
-        # Use current date if not provided
-        if 'date' not in kwargs:
-            kwargs['date'] = datetime.now().strftime('%Y-%m-%d')
-            
-        # Calculate due amount if not provided
-        if 'due_amount' not in kwargs:
-            due = kwargs.get('total_price', 0) - kwargs.get('discount', 0) - kwargs.get('payment_amount', 0)
-            kwargs['due_amount'] = max(0, due)
-        
-        result = self.model.add_sale(**kwargs)
-        
-        # Notify the event system about the new sale
-        if result:
-            # Create payload with sale details for the event system
-            event_data = {
-                "action": "add",
-                "sale": {
-                    "invoice": kwargs.get('invoice_number', ''),
-                    "customer": kwargs.get('customer_name', 'Unknown customer'),
-                    "total": kwargs.get('total_price', 0),
-                    "payment": kwargs.get('payment_amount', 0),
-                    "discount": kwargs.get('discount', 0),
-                    "due": kwargs.get('due_amount', 0),
-                    "date": kwargs.get('date', '')
-                }
-            }
-            
-            global_event_system.notify_sales_update(event_data)
-            
-            # Also notify inventory update as sales affect inventory
-            global_event_system.notify_inventory_update({
-                "action": "sale_impact",
-                "sale_id": result
-            })
-            
-        return result
+        if 'invoice_number' not in sale_data or not sale_data['invoice_number']:
+            sale_data['invoice_number'] = f"INV-{datetime.now().strftime('%Y%m')}-{self.next_id:04d}"
+            self.next_id += 1
+        if 'date' not in sale_data:
+            sale_data['date'] = datetime.now().strftime('%Y-%m-%d')
+        if 'due_amount' not in sale_data:
+            due = sale_data.get('total_price', 0) - sale_data.get('discount', 0) - sale_data.get('payment_amount', 0)
+            sale_data['due_amount'] = max(0, due)
+        return self.data_provider.add_sale(sale_data)
     
-    def get_sales(self, search=None, start_date=None, end_date=None, limit=50, offset=0):
-        """Get sales with filtering"""
-        return self.model.get_sales(search, start_date, end_date, limit, offset)
+    def get_sales(self):
+        return self.data_provider.get_sales()
     
     def get_sale_by_id(self, sale_id):
         """Get a specific sale by ID"""
-        return self.model.get_sale_by_id(sale_id)
+        return self.data_provider.get_sale_by_id(sale_id)
     
     def update_sale(self, sale_id, **kwargs):
         """Update a sale"""
@@ -79,7 +44,7 @@ class SalesController:
             due = total - discount - payment
             kwargs['due_amount'] = max(0, due)
         
-        result = self.model.update_sale(sale_id, **kwargs)
+        result = self.data_provider.update_sale(sale_id, **kwargs)
         
         # Notify the event system about the sale update
         if result:
@@ -105,7 +70,7 @@ class SalesController:
         # Get sale details before deletion for event notification
         sale = self.get_sale_by_id(sale_id)
         
-        result = self.model.delete_sale(sale_id)
+        result = self.data_provider.delete_sale(sale_id)
         
         # Notify the event system about the sale deletion
         if result:
@@ -130,17 +95,40 @@ class SalesController:
     
     def get_pending_invoices(self):
         """Get pending invoices"""
-        return self.model.get_pending_invoices()
+        return self.data_provider.get_pending_invoices()
     
     def get_sales_stats(self):
         """Get sales statistics"""
-        return self.model.get_sales_stats()
+        return self.data_provider.get_sales_stats()
     
     def generate_invoice_number(self):
         """Generate a unique invoice number"""
-        return self.model.generate_invoice_number()
+        return self.data_provider.generate_invoice_number()
 
     def create_sale(self, items, customer_id, total_amount):
+        # Error: empty cart
+        if not items:
+            raise ValueError("Cannot create sale with empty cart.")
+        # Error: invalid total_amount
+        if total_amount is None or total_amount < 0:
+            raise ValueError("Invalid total amount for sale.")
+        # Check each item for stock and existence using data_provider
+        for item in items:
+            product_id = item.get('product_id')
+            quantity = item.get('quantity', 0)
+            prod = None
+            if hasattr(self.data_provider, 'get_product_by_id'):
+                prod = self.data_provider.get_product_by_id(product_id)
+            if not prod:
+                raise Exception(f"Product with id {product_id} does not exist.")
+            if quantity > prod.get('quantity', 0):
+                raise Exception(f"Insufficient stock for product id {product_id} (requested {quantity}, available {prod.get('quantity', 0)})")
+        # Decrement stock after all checks pass
+        for item in items:
+            product_id = item.get('product_id')
+            quantity = item.get('quantity', 0)
+            prod = self.data_provider.get_product_by_id(product_id)
+            prod['quantity'] -= quantity
         sale = type('Sale', (), {})()
         sale.id = self.next_id
         sale.items = items

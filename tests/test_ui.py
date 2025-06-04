@@ -14,6 +14,7 @@ from app.controllers.sales_controller import SalesController
 from app.utils.database import DatabaseManager
 from app.controllers.user_controller import UserController
 from unittest.mock import patch
+from app.data.data_provider import BaseDataProvider
 
 class TestMainWindow(unittest.TestCase):
     @classmethod
@@ -53,10 +54,10 @@ class TestableInventoryView(InventoryView):
         self.quantity_input.setValue(0)
         self.price_input.setValue(0.0)
         if hasattr(self, 'category_input'):
-        if isinstance(self.category_input, QComboBox):
-            self.category_input.setCurrentIndex(0)
-        elif isinstance(self.category_input, QLineEdit):
-            self.category_input.setText("")
+            if isinstance(self.category_input, QComboBox):
+                self.category_input.setCurrentIndex(0)
+            elif isinstance(self.category_input, QLineEdit):
+                self.category_input.setText("")
         if hasattr(self, 'details_input'):
             self.details_input.setText("")
         if hasattr(self, 'buying_price_input'):
@@ -87,12 +88,49 @@ class FakeProductDialog:
     def exec_(self):
         return True
 
+class MockDataProvider(BaseDataProvider):
+    def __init__(self):
+        self.products = []
+        self.sales = []
+        self.next_product_id = 1
+    def get_products(self):
+        return self.products
+    def add_product(self, product_data):
+        for p in self.products:
+            if p['name'] == product_data['name']:
+                return False
+        if product_data.get('quantity', 0) < 0 or product_data.get('price', 0) < 0:
+            return False
+        product_data = dict(product_data)
+        product_data['product_id'] = self.next_product_id
+        self.next_product_id += 1
+        self.products.append(product_data)
+        return product_data['product_id']
+    def get_product_by_id(self, product_id):
+        for p in self.products:
+            if p['product_id'] == product_id:
+                return p
+        return None
+    def get_sales(self):
+        return self.sales
+    def add_sale(self, sale_data):
+        for item in sale_data.get('items', []):
+            prod = self.get_product_by_id(item['product_id'])
+            if not prod:
+                raise Exception(f"Product with id {item['product_id']} does not exist.")
+            if item['quantity'] > prod.get('quantity', 0):
+                raise Exception(f"Insufficient stock for product id {item['product_id']}")
+            prod['quantity'] -= item['quantity']
+        self.sales.append(sale_data)
+        return True
+
 class TestInventoryView(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication(sys.argv)
     def setUp(self):
-        self.db = DatabaseManager()
-        self.db.initialize(":memory:")
-        self.controller = InventoryController(self.db)
-        self.controller.products.clear()  # Ensure no leftover products
+        self.data_provider = MockDataProvider()
+        self.controller = InventoryController(self.data_provider)
         self.view = TestableInventoryView(self.controller)
         self.view.product_table.clear()  # Ensure table is empty
 
@@ -142,10 +180,12 @@ class TestInventoryView(unittest.TestCase):
         self.assertEqual(product.name, "Test Product")
 
 class TestSalesView(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication(sys.argv)
     def setUp(self):
-        self.db = DatabaseManager()
-        self.db.initialize(":memory:")
-        self.controller = SalesController(self.db)
+        self.data_provider = MockDataProvider()
+        self.controller = SalesController(self.data_provider)
         self.view = SalesView(self.controller)
         
     def test_create_sale(self):
@@ -183,42 +223,119 @@ class TestSalesView(unittest.TestCase):
         # Verify customer was selected
         self.assertEqual(self.view.selected_customer.name, "Test Customer")
 
+    def test_complete_sale_with_empty_cart(self):
+        """Test completing a sale with empty cart (should show error)"""
+        self.view.cart = []
+        with patch.object(self.view, 'show_error_dialog') as mock_error:
+            self.view._on_complete_sale()
+            mock_error.assert_called()
+
+    def test_add_to_sale_with_nonexistent_product(self):
+        """Test adding to sale with non-existent product (should show error)"""
+        self.view.product_search.setText("Nonexistent Product")
+        with patch.object(self.view, 'show_error_dialog') as mock_error:
+            self.view._on_add_to_sale()
+            mock_error.assert_called()
+
+    def test_add_to_sale_with_insufficient_stock(self):
+        """Test adding to sale with insufficient stock (should show error)"""
+        self.controller.inventory_controller.add_product(name="Test Product", quantity=1, price=10, category="Test")
+        self.view.product_search.setText("Test Product")
+        self.view.quantity_input.setValue(5)
+        with patch.object(self.view, 'show_error_dialog') as mock_error:
+            self.view._on_add_to_sale()
+            mock_error.assert_called()
+
+    def test_add_duplicate_product_ui(self):
+        """Test adding a duplicate product through the UI (should show error)"""
+        self.controller.add_product(name="Test Product", quantity=10, price=10, category="Test")
+        self.controller.add_product(name="Test Product", quantity=5, price=10, category="Test")
+        with patch.object(self.view, 'show_error_dialog') as mock_error:
+            self.view._on_add_product()
+            mock_error.assert_called()
+
+    def test_add_product_with_invalid_data_ui(self):
+        """Test adding a product with invalid data through the UI (should show error)"""
+        self.view.name_input.setText("Invalid Product")
+        self.view.quantity_input.setValue(-5)
+        self.view.price_input.setValue(10)
+        with patch.object(self.view, 'show_error_dialog') as mock_error:
+            self.view._on_add_product()
+            mock_error.assert_called()
+        self.view.quantity_input.setValue(5)
+        self.view.price_input.setValue(-10)
+        with patch.object(self.view, 'show_error_dialog') as mock_error:
+            self.view._on_add_product()
+            mock_error.assert_called()
+
+    @patch('app.models.inventory.Inventory.add_product', side_effect=Exception("DB error"))
+    def test_add_product_db_failure_ui(self, mock_add):
+        """Test DB failure on add_product through the UI (should show error)"""
+        with patch.object(self.view, 'show_error_dialog') as mock_error:
+            self.view._on_add_product()
+            mock_error.assert_called()
+
 class TestReportsView(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication(sys.argv)
     def setUp(self):
-        self.db = DatabaseManager()
-        self.db.initialize(":memory:")
+        self.data_provider = MockDataProvider()
         self.view = ReportsView()
-        
+
     def test_date_range_selection(self):
         """Test date range selection for reports"""
         # Set date range
         self.view.start_date.setDate(QDate(2024, 1, 1))
         self.view.end_date.setDate(QDate(2024, 12, 31))
-        
         # Generate report
         QTest.mouseClick(self.view.generate_button, Qt.LeftButton)
-        
         # Verify report was generated
         self.assertIsNotNone(self.view.current_report)
-        
+
     def test_report_export(self):
         """Test exporting reports"""
         # Generate a report
         self.view.start_date.setDate(QDate(2024, 1, 1))
         self.view.end_date.setDate(QDate(2024, 12, 31))
         QTest.mouseClick(self.view.generate_button, Qt.LeftButton)
-        
         # Export report
         QTest.mouseClick(self.view.export_button, Qt.LeftButton)
-        
         # Verify export file exists
         self.assertTrue(os.path.exists("reports/sales_report_2024.pdf"))
 
+    def test_export_with_no_report(self):
+        """Test exporting when no report is generated (should show error)"""
+        self.view.current_report = None
+        with patch.object(self.view, 'show_error_dialog') as mock_error:
+            QTest.mouseClick(self.view.export_button, Qt.LeftButton)
+            mock_error.assert_called()
+
+    def test_generate_report_invalid_date_range(self):
+        """Test generating report with invalid date range (should show error)"""
+        self.view.start_date.setDate(QDate(2024, 12, 31))
+        self.view.end_date.setDate(QDate(2024, 1, 1))
+        with patch.object(self.view, 'show_error_dialog') as mock_error:
+            QTest.mouseClick(self.view.generate_button, Qt.LeftButton)
+            mock_error.assert_called()
+
+    def test_export_file_write_error(self):
+        """Test export when file write fails (should show error)"""
+        self.view.start_date.setDate(QDate(2024, 1, 1))
+        self.view.end_date.setDate(QDate(2024, 12, 31))
+        QTest.mouseClick(self.view.generate_button, Qt.LeftButton)
+        with patch("builtins.open", side_effect=IOError("Disk full")):
+            with patch.object(self.view, 'show_error_dialog') as mock_error:
+                QTest.mouseClick(self.view.export_button, Qt.LeftButton)
+                mock_error.assert_called()
+
 class TestSettingsView(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication(sys.argv)
     def setUp(self):
-        self.db = DatabaseManager()
-        self.db.initialize(":memory:")
-        self.controller = UserController(self.db)
+        self.data_provider = MockDataProvider()
+        self.controller = UserController(self.data_provider)
         self.view = SettingsView(self.controller)
         
     def test_user_creation(self):

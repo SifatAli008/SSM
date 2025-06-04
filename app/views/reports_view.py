@@ -70,6 +70,10 @@ class ReportsView(QWidget):
         self.load_data()
         self.setMinimumSize(1700, 1050)
     
+    def show_error_dialog(self, message, title="Error"):
+        logger.error(f"{title}: {message}")
+        QMessageBox.critical(self, title, message)
+    
     def init_ui(self):
         self.setWindowTitle("Reports & Analytics")
         main_layout = QVBoxLayout(self)
@@ -162,8 +166,7 @@ class ReportsView(QWidget):
             self.profit_margin_label.setText(f"Profit Margin: {profit_data.get('profit_margin', 0):.1f}%")
             
         except Exception as e:
-            logger.error(f"Error loading report data: {str(e)}")
-            show_error(self, f"Failed to load some report data: {str(e)}")
+            self.show_error_dialog(f"Failed to load some report data: {str(e)}", title="Report Load Error")
     
     def refresh_data(self):
         """Refresh all report data to ensure real-time updates"""
@@ -205,11 +208,10 @@ class ReportsView(QWidget):
                     reports_dir = self.controller.get_reports_dir() if hasattr(self.controller, 'get_reports_dir') else "reports"
                     os.startfile(reports_dir)
             else:
-                show_error(self, "Failed to generate sales report. Please try again later.", title="Report Error")
+                self.show_error_dialog("Failed to generate sales report. Please try again later.", title="Sales Report Error")
                 
         except Exception as e:
-            logger.error(f"Error generating sales report: {str(e)}")
-            show_error(self, f"Error generating report: {str(e)}", title="Report Error")
+            self.show_error_dialog(f"Failed to generate sales report: {str(e)}", title="Sales Report Error")
     
     def generate_inventory_report(self):
         """Generate and open inventory report PDF"""
@@ -235,11 +237,10 @@ class ReportsView(QWidget):
                     reports_dir = os.path.dirname(report_path)
                     os.startfile(reports_dir)
             else:
-                show_error(self, "Failed to generate inventory report. No inventory items found or an error occurred.", title="Report Error")
+                self.show_error_dialog("Failed to generate inventory report. No inventory items found or an error occurred.", title="Report Error")
                 
         except Exception as e:
-            logger.error(f"Error generating inventory report: {str(e)}")
-            show_error(self, f"Error generating report: {str(e)}", title="Report Error")
+            self.show_error_dialog(f"Error generating inventory report: {str(e)}", title="Report Error")
     
     def generate_financial_report(self):
         """Generate financial report"""
@@ -465,7 +466,7 @@ class ReportsView(QWidget):
                     "count": inv.get('total_items', 0)
                 }]
         except Exception as e:
-            logger.error(f"Error loading inventory by category: {str(e)}")
+            self.show_error_dialog(f"Error loading inventory by category: {str(e)}", title="Inventory Error")
             categories = []
         for cat in categories:
             card = QFrame()
@@ -665,7 +666,7 @@ class ReportsView(QWidget):
             c.save()
             QMessageBox.information(self, "Export PDF", f"PDF report exported successfully to:\n{file_path}")
         except Exception as e:
-            show_error(self, f"Failed to export PDF: {str(e)}", title="Export PDF Error")
+            self.show_error_dialog(f"Failed to export PDF: {str(e)}", title="Export PDF Error")
 
     def export_excel_report(self):
         """Export a business report as Excel for the selected period using pandas"""
@@ -688,7 +689,7 @@ class ReportsView(QWidget):
                 summary_df.to_excel(writer, index=False, sheet_name='AI Summary')
             QMessageBox.information(self, "Export Excel", f"Excel report exported successfully to:\n{file_path}")
         except Exception as e:
-            show_error(self, f"Failed to export Excel: {str(e)}", title="Export Excel Error")
+            self.show_error_dialog(f"Failed to export Excel: {str(e)}", title="Export Excel Error")
 
     def print_report(self):
         """Print the business report using QPrinter"""
@@ -705,7 +706,7 @@ class ReportsView(QWidget):
                 self.render(printer)
                 QMessageBox.information(self, "Print", "Report sent to printer.")
         except Exception as e:
-            show_error(self, f"Failed to print report: {str(e)}", title="Print Error")
+            self.show_error_dialog(f"Failed to print report: {str(e)}", title="Print Error")
 
     def _on_export_report(self):
         import os

@@ -1060,17 +1060,35 @@ class InventoryView(QWidget):
                 self.card_labels['value']['value'].setText(f"${total_value:,.2f}")
 
     def _on_add_product(self):
-        name = self.name_input.text()
-        quantity = self.quantity_input.value()
-        price = self.price_input.value()
-        category = get_widget_text(self.category_input)
-        product = ProductData(name=name, quantity=quantity, price=price, category=category)
-        valid, msg = validate_product_data(product)
-        if not valid:
-            show_error(self, msg, title="Validation Error")
-            return
-        prod = self.controller.add_product(**product.__dict__)
-        self.product_table.addRow([prod.name, prod.quantity, prod.price, prod.category])
+        try:
+            name = self.name_input.text()
+            quantity = self.quantity_input.value()
+            price = self.price_input.value()
+            category = get_widget_text(self.category_input)
+            product = ProductData(name=name, quantity=quantity, price=price, category=category)
+            valid, msg = validate_product_data(product)
+            if not valid:
+                show_error(self, msg, title="Validation Error")
+                return
+            if self.controller and hasattr(self.controller, 'add_product'):
+                success = self.controller.add_product(
+                    name=name,
+                    quantity=quantity,
+                    price=price,
+                    category=category,
+                    buying_price=price,
+                    selling_price=price
+                )
+                if success:
+                    logger.info(f"[{self.user_role}] Added product: {name}, qty={quantity}, category={category}")
+                    self.refresh_from_controller()
+                    QMessageBox.information(self, "Success", f"Product '{name}' added successfully!")
+                else:
+                    QMessageBox.critical(self, "Error", "Failed to add product. Please try again.")
+            else:
+                show_error(self, "Add functionality is not available.", title="Not Implemented")
+        except Exception as e:
+            self.show_error_dialog(f"Failed to add product: {str(e)}", title="Add Product Error")
 
     def _on_search(self):
         query = self.search_input.text()
@@ -1080,23 +1098,109 @@ class InventoryView(QWidget):
             self.product_table.addRow([prod.name, prod.quantity, prod.price, prod.category])
 
     def _on_edit_product(self):
-        row = 0  # For test, always edit first row
-        self._edit_row = row
-        prod = self.controller.get_all_products()[row]
-        self.name_input.setText(prod.name)
-        self.quantity_input.setValue(prod.quantity)
-        self.price_input.setValue(prod.price)
-        self.category_input.setText(prod.category)
+        try:
+            if self.selected_row < 0:
+                show_error(self, "Please select a product to edit.", title="No Selection")
+                return
+            
+            # Get current values from the model using the updated column mapping
+            id_col = 1  # Serial Number (ID column)
+            name_col = 2  # Product Name
+            details_col = 3  # Product Details
+            stock_col = 4  # Product Quantity
+            
+            # Get data from model
+            product_id = self.controller.model.data(self.controller.model.index(self.selected_row, id_col))
+            name = self.controller.model.data(self.controller.model.index(self.selected_row, name_col))
+            details = self.controller.model.data(self.controller.model.index(self.selected_row, details_col))
+            stock = self.controller.model.data(self.controller.model.index(self.selected_row, stock_col))
+            
+            # Get additional fields if they exist in the database
+            # The controller methods return the actual values, not dictionaries
+            buying_price = 0.0
+            selling_price = 0.0
+            category = "Other"
+            
+            # Get buying price from column 5 (if available)
+            if self.controller.model.columnCount() > 5:
+                buying_price_val = self.controller.model.data(self.controller.model.index(self.selected_row, 5))
+                if buying_price_val is not None:
+                    try:
+                        buying_price = float(buying_price_val)
+                    except (ValueError, TypeError):
+                        pass
+            
+            # Get selling price from column 6 (if available)
+            if self.controller.model.columnCount() > 6:
+                selling_price_val = self.controller.model.data(self.controller.model.index(self.selected_row, 6))
+                if selling_price_val is not None:
+                    try:
+                        selling_price = float(selling_price_val)
+                    except (ValueError, TypeError):
+                        pass
+            
+            # Get category from column 3 (category field)
+            if self.controller.model.columnCount() > 3:
+                category_val = self.controller.model.data(self.controller.model.index(self.selected_row, 3))
+                if category_val is not None:
+                    category = str(category_val)
+            
+            dialog = ProductDialog(
+                self, 
+                "Edit Product", 
+                name, 
+                stock, 
+                buying_price, 
+                selling_price,
+                details,
+                category
+            )
+            
+            if dialog.exec_():
+                # Prepare updated data with correct column indices
+                updated_data = {
+                    name_col: dialog.name_input.text(),
+                    details_col: dialog.details_input.toPlainText(),
+                    stock_col: int(dialog.qty_input.text())
+                }
+                
+                # Add additional fields to the update
+                additional_data = {
+                    "buying_price": float(dialog.buying_price_input.text()),
+                    "selling_price": float(dialog.selling_price_input.text()),
+                    "category": dialog.category_input.text()
+                }
+                
+                # Update the product
+                if hasattr(self.controller, 'update_item'):
+                    success = self.controller.update_item(self.selected_row, updated_data, additional_data)
+                    if success:
+                        logger.info(f"[{self.user_role}] Edited product: {name} (row {self.selected_row})")
+                        self.refresh_from_controller()
+                        QMessageBox.information(self, "Success", f"Product updated successfully!")
+                    else:
+                        QMessageBox.critical(self, "Error", "Failed to update product. Please try again.")
+                else:
+                    show_error(self, "Update functionality is not available.", title="Not Implemented")
+        except Exception as e:
+            self.show_error_dialog(f"Failed to edit product: {str(e)}", title="Edit Product Error")
 
     def _on_save_product(self):
-        if self._edit_row is not None:
-            prod = self.controller.get_all_products()[self._edit_row]
-            prod.name = self.name_input.text()
-            prod.quantity = self.quantity_input.value()
-            prod.price = self.price_input.value()
-            prod.category = self.category_input.text()
-            self._edit_row = None
-            self._on_search()
+        try:
+            if self._edit_row is not None:
+                prod = self.controller.get_all_products()[self._edit_row]
+                prod.name = self.name_input.text()
+                prod.quantity = self.quantity_input.value()
+                prod.price = self.price_input.value()
+                prod.category = self.category_input.text()
+                self._edit_row = None
+                self._on_search()
+        except Exception as e:
+            self.show_error_dialog(f"Failed to save product: {str(e)}", title="Save Product Error")
+
+    def show_error_dialog(self, message, title="Error"):
+        logger.error(f"{title}: {message}")
+        QMessageBox.critical(self, title, message)
 
 class ProductDialog(QDialog):
     def __init__(self, parent=None, title="Product", name="", qty=0, buying_price=0.0, selling_price=0.0, 

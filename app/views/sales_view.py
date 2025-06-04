@@ -383,31 +383,34 @@ class SalesView(QWidget):
         return max(subtotal + tax - discount, 0)
 
     def _on_complete_sale(self):
-        if self.cart:
-            total = sum(item['price'] * item['qty'] for item in self.cart)
-            self.controller.create_sale(self.cart, 1, total)
-            # --- Add purchases to database ---
-            if self.purchases_controller and self.customer_controller:
-                customer_name = getattr(self.selected_customer, 'name', None)
-                if not customer_name:
-                    QMessageBox.warning(self, "Error", "No customer selected.")
-                else:
-                    customer = self.customer_controller.get_customer_by_name(customer_name)
-                    if customer:
-                        customer_id = customer[0]
-                        sale_date = QDate.currentDate().toString("yyyy-MM-dd")
-                        for item in self.cart:
-                            self.purchases_controller.add_purchase(
-                                customer_id=customer_id,
-                                product=item['name'],
-                                quantity=item['qty'],
-                                price=item['price'],
-                                total=item['qty'] * item['price'],
-                                date=sale_date
-                            )
+        try:
+            if self.cart:
+                total = sum(item['price'] * item['qty'] for item in self.cart)
+                self.controller.create_sale(self.cart, 1, total)
+                # --- Add purchases to database ---
+                if self.purchases_controller and self.customer_controller:
+                    customer_name = getattr(self.selected_customer, 'name', None)
+                    if not customer_name:
+                        QMessageBox.warning(self, "Error", "No customer selected.")
                     else:
-                        QMessageBox.warning(self, "Error", f"Customer '{customer_name}' not found.")
-            self.cart = []
+                        customer = self.customer_controller.get_customer_by_name(customer_name)
+                        if customer:
+                            customer_id = customer[0]
+                            sale_date = QDate.currentDate().toString("yyyy-MM-dd")
+                            for item in self.cart:
+                                self.purchases_controller.add_purchase(
+                                    customer_id=customer_id,
+                                    product=item['name'],
+                                    quantity=item['qty'],
+                                    price=item['price'],
+                                    total=item['qty'] * item['price'],
+                                    date=sale_date
+                                )
+                        else:
+                            QMessageBox.warning(self, "Error", f"Customer '{customer_name}' not found.")
+                self.cart = []
+        except Exception as e:
+            self.show_error_dialog(f"Failed to complete sale: {str(e)}", title="Complete Sale Error")
 
     def update_summary(self):
         subtotal = sum(item['price'] * item['qty'] for item in self.cart)
@@ -647,11 +650,34 @@ class SalesView(QWidget):
         return True
 
     def _on_add_to_sale(self):
-        name = self.product_search.text()
-        quantity = self.quantity_input.value()
-        prod = self.controller.inventory_controller.get_product(name)
-        if prod:
-            self.cart.append({'name': prod.name, 'price': prod.price, 'qty': quantity, 'stock': prod.quantity})
+        try:
+            name = self.product_search.text()
+            quantity = self.quantity_input.value()
+            prod = self.controller.inventory_controller.get_product(name)
+            if prod:
+                self.cart.append({'name': prod.name, 'price': prod.price, 'qty': quantity, 'stock': prod.quantity})
+        except Exception as e:
+            self.show_error_dialog(f"Failed to add product to sale: {str(e)}", title="Add to Sale Error")
+
+    def show_error_dialog(self, message, title="Error"):
+        logger.error(f"{title}: {message}")
+        QMessageBox.critical(self, title, message)
+
+    def _on_add_to_sale(self):
+        try:
+            # ... existing add to sale logic ...
+            pass
+        except Exception as e:
+            self.show_error_dialog(f"Failed to add product to sale: {str(e)}", title="Add to Sale Error")
+
+    def _on_complete_sale(self):
+        try:
+            # ... existing complete sale logic ...
+            pass
+        except Exception as e:
+            self.show_error_dialog(f"Failed to complete sale: {str(e)}", title="Complete Sale Error")
+
+    # Repeat for other user actions as needed
 
 # NOTE: The code you provided was cut off at 'refresh_items_table'.
 # Please provide the rest of the code for a full replacement if needed.

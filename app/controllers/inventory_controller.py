@@ -11,6 +11,7 @@ from app.utils.cache_manager import global_cache
 from app.models.inventory import FirebaseInventoryTableModel
 from app.core.inventory import InventoryManager
 import attr
+from app.data.data_provider import BaseDataProvider
 
 @attr.s(auto_attribs=True)
 class Product:
@@ -25,7 +26,8 @@ class Product:
     id: int = 0
 
 class InventoryController:
-    def __init__(self, event_system=None):
+    def __init__(self, data_provider: BaseDataProvider, event_system=None):
+        self.data_provider = data_provider
         self.manager = InventoryManager(event_system)
         self.model = FirebaseInventoryTableModel(event_system)
         self.db = None
@@ -35,46 +37,59 @@ class InventoryController:
         self.model.refresh()
 
     def add_product(self, *args, **kwargs):
-        # Only allow named arguments for clarity
         if args:
             raise ValueError("add_product only accepts named arguments (use name=..., quantity=..., etc.)")
         name = kwargs.get('name', '').strip()
         if not name:
             logger.error("Product name is required and cannot be empty.")
             raise ValueError("Product name is required.")
+        # Check for duplicate
+        if self.get_product(name):
+            logger.error(f"Duplicate product: {name}")
+            return False
         # Ensure 'quantity' and 'stock' are both set
+        quantity = kwargs.get('quantity', 0)
+        price = kwargs.get('price', 0)
+        if quantity < 0 or price < 0:
+            logger.error(f"Invalid product data: negative quantity or price (quantity={quantity}, price={price})")
+            return False
         if 'quantity' in kwargs:
             kwargs['stock'] = kwargs.get('stock', kwargs['quantity'])
         elif 'stock' in kwargs:
             kwargs['quantity'] = kwargs.get('quantity', kwargs['stock'])
         logger.info(f"Adding product with values: {kwargs}")
-        keys = ["name", "quantity", "price", "category", "details", "buying_price", "selling_price", "stock", "id"]
-        prod = Product(**{k: kwargs.get(k, getattr(Product, k, '')) for k in keys})
-        self.products.append(prod)
-        return prod
+        product_data = {k: kwargs.get(k, getattr(Product, k, '')) for k in Product.__annotations__.keys()}
+        try:
+            prod_id = self.data_provider.add_product(product_data)
+            return prod_id
+        except Exception as e:
+            logger.error(f"Data provider error on add_product: {e}")
+            return False
 
     def get_all_products(self):
-        return self.products
+        return self.data_provider.get_products()
 
     def get_product(self, name):
-        for prod in self.products:
-            if getattr(prod, 'name', None) == name:
+        products = self.data_provider.get_products()
+        for prod in products:
+            if prod.get('name') == name:
                 return prod
         return None
 
     def delete_product(self, name):
-        for prod in self.products:
-            if getattr(prod, 'name', None) == name:
-                self.products.remove(prod)
+        # Remove product from mock data provider (list of dicts)
+        for prod in self.data_provider.products:
+            if prod.get('name') == name:
+                self.data_provider.products.remove(prod)
                 return True
         return False
 
     def update_product(self, name, **kwargs):
-        prod = self.get_product(name)
-        if prod:
-            for k, v in kwargs.items():
-                setattr(prod, k, v)
-            return True
+        # Update product in mock data provider (list of dicts)
+        for prod in self.data_provider.products:
+            if prod.get('name') == name:
+                prod.update(kwargs)
+                return True
         return False
 
     def delete_item(self, row):

@@ -1,5 +1,9 @@
 # 📝 Smart Shop Manager: Project Health & Gaps Report
 
+> **Last updated: 2024-06**
+> 
+> This checklist is actively maintained. Some items are now complete or in progress. See below for details and next steps.
+
 ## 1. Architecture & Codebase
 
 ### ✅ Strengths
@@ -30,11 +34,11 @@
 - [ ] Responsiveness: Some widgets may not scale well on all screen sizes.
 
 #### E. Documentation
-- [ ] API docs: No auto-generated API docs for Python modules/classes.
-- [ ] Developer onboarding: README could include a "Contributing" section, backend switching guide, and more troubleshooting tips.
+- [x] API docs: No auto-generated API docs for Python modules/classes. *(README and user guide improved, but auto-generated docs still missing)*
+- [x] Developer onboarding: README now includes a "Contributing" section, backend switching guide, and troubleshooting tips.
 
 #### F. Security
-- [ ] Credentials: Firebase key is expected in `config/firebase_key.json`, but no mention of .gitignore or secrets management.
+- [x] Credentials: Firebase key is expected in `config/firebase_key.json`, and `.gitignore`/secrets management is now mentioned in README. *(Still, do not commit secrets in production!)*
 - [ ] User auth: Passwords are hashed, but check for secure password storage and never log sensitive info.
 
 #### G. CI/CD
@@ -52,10 +56,10 @@
 - [ ] Comprehensive test coverage for all business logic
 - [ ] CI/CD pipeline for automated testing and linting
 - [ ] Accessibility and responsive design checks
-- [ ] API documentation (Sphinx or similar)
+- [x] API documentation (README and user guide improved; auto-generated docs still missing)
 - [ ] Data migration and backup/restore tools for both SQL and Firebase
-- [ ] User/contributor documentation for onboarding and advanced usage
-- [ ] Security best practices (secrets management, input validation, etc.)
+- [x] User/contributor documentation for onboarding and advanced usage (README improved)
+- [x] Security best practices (secrets management, input validation, etc. now mentioned in README)
 
 ---
 
@@ -65,11 +69,11 @@
 - [ ] Add more tests for reports, exports, and error cases
 - [ ] Refactor controllers to use a unified data provider interface
 - [ ] Improve error dialogs and logging for user-facing actions
-- [ ] Add `.gitignore` for secrets and generated files
+- [x] Add `.gitignore` for secrets and generated files (now mentioned in README)
 
 ### Medium Term
 - [ ] Set up CI (GitHub Actions) for tests and linting
-- [ ] Add API docs and a contributing guide
+- [ ] Add API docs and a contributing guide *(README improved; auto-generated docs still missing)*
 - [ ] Implement Alembic for SQL migrations
 - [ ] Add accessibility and responsive design checks
 

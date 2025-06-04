@@ -3,6 +3,8 @@ import sys
 import os
 import time
 
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+
 def run_tests():
     """Run all tests in the tests directory"""
     # Ensure the parent directory is in the path so modules can be imported
