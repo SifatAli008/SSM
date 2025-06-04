@@ -2,6 +2,16 @@
 
 A comprehensive desktop application for retail store management built with Python and PyQt5. The application provides a modern, responsive UI with intuitive controls for managing inventory, sales, customers, and generating reports.
 
+---
+
+## 🚀 Project Status (2024)
+- **Actively developed**: Core features are implemented and the app is runnable.
+- **Hybrid backend**: Inventory is fully cloud-native (Firebase), but some features still use SQL/SQLite.
+- **Known gaps**: Some reports, error dialogs, and data migration tools are incomplete (see below).
+- **Main entry point**: Use `python run.py` to launch the app.
+
+---
+
 ## Recent Improvements
 - **Full migration to Firebase for inventory:** All inventory operations (CRUD, analytics, categories) are now live-synced with Firebase Realtime Database for real-time, cloud-based management
 - Removed all SQL/SQLite logic from inventory management for a fully cloud-native backend
@@ -145,6 +155,22 @@ For more detailed documentation about specific components:
 - [Event System Documentation](README_EVENT_SYSTEM.md) - Details about the real-time event system
 - [API Reference](docs/API.md) - API documentation for developers
 - [User Guide](docs/USER_GUIDE.md) - Comprehensive guide for users
+
+## Contributing
+
+Contributions are welcome! Please open issues or pull requests for bugs, improvements, or new features. See the [GitHub repository](https://github.com/SifatAli008/SSM) for details.
+
+## Known Limitations & TODOs
+- Some controllers and reports still use SQL/SQLite instead of Firebase.
+- No unified backend abstraction for switching between SQL and Firebase.
+- Some error dialogs and user feedback are incomplete.
+- Data migration and backup/restore tools for both SQL and Firebase are not fully implemented.
+- No CI/CD pipeline or deployment scripts yet.
+- See `PROJECT_HEALTH_REPORT.md` for a full list of gaps and recommendations.
+
+## Security & Secrets
+- **Do not commit secrets or private keys to public repositories.**
+- The `.gitignore` file should include `config/firebase_key.json` and other sensitive files for production deployments.
 
 ## License
 
