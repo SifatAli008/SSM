@@ -6,6 +6,21 @@ import os
 from datetime import datetime
 from app.utils.logger import Logger
 
+def close_logger_handlers(logger):
+    if hasattr(logger, 'logger'):
+        log = logger.logger
+    else:
+        log = logger
+    handlers = getattr(log, 'handlers', [])
+    for handler in handlers:
+        try:
+            handler.close()
+        except Exception:
+            pass
+    log.handlers = []
+    # Remove logger from logging manager
+    logging.Logger.manager.loggerDict.pop(log.name, None)
+
 @pytest.mark.integration
 class TestLogger:
     def test_logger_initialization(self, temp_dir):
@@ -212,7 +227,8 @@ class TestLogger:
         assert " - " in log_line  # Separator
         assert "INFO" in log_line  # Log level
         assert test_message in log_line  # Message
-        assert "app.utils.logger" in log_line  # Logger name
+        assert "SmartShopManager." in log_line  # Logger name
+        close_logger_handlers(logger)
     
     def test_multiple_loggers(self, temp_dir):
         """Test multiple logger instances."""
@@ -270,4 +286,9 @@ class TestLogger:
         assert "Debug message" not in log_content
         assert "Info message" not in log_content
         assert "Warning message" in log_content
-        assert "Error message" in log_content 
+        assert "Error message" in log_content
+        close_logger_handlers(logger)
+
+def teardown_module(module):
+    import logging
+    logging.shutdown() 

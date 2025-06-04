@@ -1,11 +1,13 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from app.utils.logger import logger
+from app.utils.logger import Logger
 from app.utils.database import DatabaseManager
 from app.core.event_system import EventSystem, EventTypes
 from app.models.base import Product, ProductCreate, ProductUpdate, Category, CategoryCreate, CategoryUpdate
 from app.ui.firebase_utils import get_db
 import random
+
+logger = Logger()
 
 class InventoryManager:
     def __init__(self, event_system: EventSystem):

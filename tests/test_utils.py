@@ -2,7 +2,8 @@ import unittest
 from datetime import datetime
 import os
 import json
-from app.utils.logger import logger
+from app.utils.logger import Logger
+logger = Logger()
 from app.utils.config_manager import config_manager
 from app.utils.database import DatabaseManager
 from app.utils.cache_manager import CacheManager

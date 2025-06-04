@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
-from app.utils.logger import logger
+from app.utils.logger import Logger
 from app.utils.config_manager import config_manager
 from app.utils.database import DatabaseManager
 from app.ui.main_window import MainWindow
@@ -12,6 +12,8 @@ from app.core.reports import ReportManager
 from app.core.inventory import InventoryManager
 from app.core.sales import SalesManager
 from app.core.users import UserManager
+
+logger = Logger()
 
 class Application:
     def __init__(self):

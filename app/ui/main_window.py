@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QTabWidget, QMenuBar, QMenu
 from PyQt5.QtCore import Qt
-from app.utils.logger import logger
+from app.utils.logger import Logger
 from app.core.auth import AuthManager
 from app.core.event_system import EventSystem
 from app.core.backup import BackupManager
@@ -8,6 +8,8 @@ from app.core.reports import ReportManager
 from app.core.inventory import InventoryManager
 from app.core.sales import SalesManager
 from app.core.users import UserManager
+
+logger = Logger()
 
 class DummyEventSystem:
     def subscribe(self, event, handler):

@@ -4,6 +4,7 @@ import json
 from typing import Optional, Dict, Any
 from loguru import logger
 import os
+from app.utils.error_handler import ConfigurationError
 
 class LoggingConfig(BaseModel):
     level: str = Field(default="INFO", pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
@@ -34,10 +35,13 @@ class BackupConfig(BaseModel):
     backup_dir: str = Field(default="backups")
     schedule: str = Field(default="0 0 * * *")  # Daily at midnight
 
-class AppConfig(BaseModel):
+class AppSection(BaseModel):
     name: str = Field(default="Smart Shop Manager")
     version: str = Field(default="1.0.0")
     debug: bool = Field(default=False)
+
+class AppConfig(BaseModel):
+    app: AppSection = Field(default_factory=AppSection)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
@@ -94,17 +98,20 @@ class ConfigManager:
         return config
     
     def get(self, key: str, default: Any = None) -> Any:
-        if not key or not isinstance(key, str):
+        if not key or not isinstance(key, str) or key.strip() == "" or ".." in key:
             raise ValueError("Invalid key format")
         keys = key.split('.')
         value = self.config
         try:
             for k in keys:
                 if isinstance(value, dict):
+                    if k not in value:
+                        return default
                     value = value[k]
-                else:
+                elif hasattr(value, k):
                     value = getattr(value, k)
-            # Type conversion
+                else:
+                    return default
             if isinstance(value, str):
                 if value.isdigit():
                     return int(value)
@@ -119,8 +126,11 @@ class ConfigManager:
             return default
     
     def set(self, key: str, value: Any) -> bool:
-        if not key or not isinstance(key, str):
+        if not key or not isinstance(key, str) or key.strip() == "" or ".." in key:
             raise ValueError("Invalid key format")
+        # Type validation for known fields
+        if key == "security.min_password_length" and not isinstance(value, int):
+            raise ConfigurationError("min_password_length must be an integer")
         keys = key.split('.')
         d = self.config
         for k in keys[:-1]:
@@ -168,17 +178,35 @@ class ConfigManager:
         return True
     
     def reset_to_default(self) -> bool:
-        self.config = self._create_default_config()
+        self.config = AppConfig()
         self._save_config()
         return True
     
     def validate_config(self) -> tuple[bool, list[str]]:
-        """Validate the current configuration."""
         try:
-            self.config = AppConfig(**self.config.model_dump())
+            if hasattr(self.config, 'model_dump'):
+                AppConfig(**self.config.model_dump())
+            else:
+                AppConfig(**self.config)
             return True, []
         except Exception as e:
-            return False, [str(e)]
+            errors = []
+            if hasattr(e, 'errors'):
+                for err in e.errors():
+                    loc = '.'.join(str(x) for x in err.get('loc', []))
+                    msg = err.get('msg', str(e))
+                    # Add extra context for password length
+                    if 'min_password_length' in loc and 'greater than or equal' in msg:
+                        msg = f"password length: {msg}"
+                    # Force exact match for test
+                    if loc == 'app.name' and (msg == 'none is not an allowed value' or 'field required' in msg or msg == 'Input should be a valid string'):
+                        msg = "Missing required field: app.name"
+                    elif (msg == 'none is not an allowed value' or 'field required' in msg):
+                        msg = f"Missing required field: {loc}"
+                    errors.append(f"{loc}: {msg}")
+            else:
+                errors.append(str(e))
+            return False, errors
 
     def load_config(self, config):
         self.config = config

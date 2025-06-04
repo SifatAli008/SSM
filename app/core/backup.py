@@ -5,10 +5,12 @@ from pathlib import Path
 from threading import Thread, Event
 import time
 from typing import Optional, List
-from app.utils.logger import logger
+from app.utils.logger import Logger
 from app.utils.config_manager import config_manager
 from app.utils.database import DatabaseManager
 from app.core.event_system import EventSystem, EventTypes
+
+logger = Logger()
 
 class BackupManager:
     def __init__(self, event_system: EventSystem):

@@ -2,10 +2,12 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from app.utils.logger import logger
+from app.utils.logger import Logger
 from app.utils.config_manager import config_manager
 from app.utils.database import DatabaseManager
 from app.models.base import User, UserCreate, UserUpdate, UserInDB
+
+logger = Logger()
 
 class AuthManager:
     def __init__(self):

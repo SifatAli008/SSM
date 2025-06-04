@@ -53,10 +53,10 @@ class TestableInventoryView(InventoryView):
         self.quantity_input.setValue(0)
         self.price_input.setValue(0.0)
         if hasattr(self, 'category_input'):
-            if isinstance(self.category_input, QComboBox):
-                self.category_input.setCurrentIndex(0)
-            elif isinstance(self.category_input, QLineEdit):
-                self.category_input.setText("")
+        if isinstance(self.category_input, QComboBox):
+            self.category_input.setCurrentIndex(0)
+        elif isinstance(self.category_input, QLineEdit):
+            self.category_input.setText("")
         if hasattr(self, 'details_input'):
             self.details_input.setText("")
         if hasattr(self, 'buying_price_input'):

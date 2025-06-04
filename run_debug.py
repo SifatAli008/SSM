@@ -4,9 +4,11 @@ import os
 import logging
 from PyQt5.QtWidgets import QApplication
 from app.views.main_window import MainWindow
-from app.utils.logger import logger
+from app.utils.logger import Logger
 from app.utils.event_system import global_event_system
 from app.utils.cache_manager import global_cache
+
+logger = Logger()
 
 def configure_debug_mode():
     """

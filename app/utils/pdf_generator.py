@@ -7,7 +7,8 @@ from reportlab.lib.units import inch, cm
 import os
 from pathlib import Path
 from datetime import datetime
-from app.utils.logger import logger
+from app.utils.logger import Logger
+logger = Logger()
 
 
 class PDFGenerator:

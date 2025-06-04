@@ -1,6 +1,8 @@
 import numpy as np
 from datetime import datetime, timedelta
-from app.utils.logger import logger
+from app.utils.logger import Logger
+
+logger = Logger()
 
 class AIInsights:
     """

@@ -11,7 +11,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QFont, QColor, QIcon
 from app.utils.theme_manager import ThemeManager
 from app.views.widgets.components import Card, Button, TableComponent
-from app.views.widgets.card_widget import CardWidget
+from app.views.widgets.reusable_shop_info_card import ReusableShopInfoCard, ShopCardPresets
 from app.views.widgets.action_button import ActionButton
 from app.core.sales import SalesManager
 from app.utils.ui_helpers import show_error
@@ -100,6 +100,8 @@ class SalesView(QWidget):
     def __init__(self, controller=None, parent=None):
         super().__init__(parent)
         self.controller = controller
+        self.purchases_controller = None
+        self.customer_controller = None
         self.product_search = QLineEdit()
         self.quantity_input = QSpinBox()
         self.add_to_sale_button = QPushButton()
@@ -116,6 +118,12 @@ class SalesView(QWidget):
         self.add_to_sale_button.clicked.connect(self._on_add_to_sale)
         self.complete_sale_button.clicked.connect(self._on_complete_sale)
         self.init_ui()
+
+    def set_purchases_controller(self, purchases_controller):
+        self.purchases_controller = purchases_controller
+
+    def set_customer_controller(self, customer_controller):
+        self.customer_controller = customer_controller
 
     def init_ui(self):
         main_layout = QHBoxLayout(self)
@@ -135,7 +143,13 @@ class SalesView(QWidget):
         left_panel.addWidget(subtitle)
 
         # Product Search Card
-        product_card = Card()
+        product_card = ReusableShopInfoCard({
+            "title": "Product Search",
+            "color": "#3498db",
+            "icon": "🔍"
+        })
+        product_card.value_label.setFont(QFont("Segoe UI", 36, QFont.Bold))
+        product_card.subtitle_label.setFont(QFont("Segoe UI", 13))
         product_card.layout.setSpacing(16)
         product_card.layout.setContentsMargins(16, 16, 16, 16)
         product_card.layout.addWidget(self._product_search_section())
@@ -213,7 +227,13 @@ class SalesView(QWidget):
         self._populate_product_list()
 
     def _cart_section(self):
-        card = Card("Shopping Cart")
+        card = ReusableShopInfoCard({
+            "title": "Shopping Cart",
+            "color": "#2ecc71",
+            "icon": "🛒"
+        })
+        card.value_label.setFont(QFont("Segoe UI", 36, QFont.Bold))
+        card.subtitle_label.setFont(QFont("Segoe UI", 13))
         card.layout.setSpacing(8)
         card.layout.setContentsMargins(16, 16, 16, 16)
         self.cart_list = QVBoxLayout()
@@ -289,7 +309,13 @@ class SalesView(QWidget):
         self.refresh_cart()
 
     def _order_summary_section(self):
-        card = Card("Order Summary")
+        card = ReusableShopInfoCard({
+            "title": "Order Summary",
+            "color": "#f39c12",
+            "icon": "📋"
+        })
+        card.value_label.setFont(QFont("Segoe UI", 36, QFont.Bold))
+        card.subtitle_label.setFont(QFont("Segoe UI", 13))
         card.layout.setSpacing(12)
         card.layout.setContentsMargins(16, 16, 16, 16)
         # Subtotal, tax, total
@@ -360,6 +386,27 @@ class SalesView(QWidget):
         if self.cart:
             total = sum(item['price'] * item['qty'] for item in self.cart)
             self.controller.create_sale(self.cart, 1, total)
+            # --- Add purchases to database ---
+            if self.purchases_controller and self.customer_controller:
+                customer_name = getattr(self.selected_customer, 'name', None)
+                if not customer_name:
+                    QMessageBox.warning(self, "Error", "No customer selected.")
+                else:
+                    customer = self.customer_controller.get_customer_by_name(customer_name)
+                    if customer:
+                        customer_id = customer[0]
+                        sale_date = QDate.currentDate().toString("yyyy-MM-dd")
+                        for item in self.cart:
+                            self.purchases_controller.add_purchase(
+                                customer_id=customer_id,
+                                product=item['name'],
+                                quantity=item['qty'],
+                                price=item['price'],
+                                total=item['qty'] * item['price'],
+                                date=sale_date
+                            )
+                    else:
+                        QMessageBox.warning(self, "Error", f"Customer '{customer_name}' not found.")
             self.cart = []
 
     def update_summary(self):
@@ -412,29 +459,24 @@ class SalesView(QWidget):
     def add_sale(self):
         """Process a new sale with a detailed dialog"""
         dialog = SaleDialog(self)
-        
         # Set default values for new sale
         dialog.date.setDate(QDate.currentDate())
         dialog.total.setValue(0)
         dialog.payment.setValue(0)
         dialog.discount.setValue(0)
         dialog.status.setCurrentText("Completed")
-        
         if dialog.exec_():
             try:
                 data = dialog.get_data()
-                
                 # Calculate any due amount
                 due_amount = data['total'] - data['payment'] - data['discount']
                 if due_amount > 0:
                     data['status'] = "Pending"
-                
                 # Show confirmation with complete details
                 confirmation = QMessageBox()
                 confirmation.setWindowTitle("Sale Confirmation")
                 confirmation.setIcon(QMessageBox.Information)
                 confirmation.setText(f"<b>Sale Processed Successfully</b>")
-                
                 details = (
                     f"<table style='margin-top:10px'>"
                     f"<tr><td>Customer:</td><td>{data['customer']}</td></tr>"
@@ -447,23 +489,32 @@ class SalesView(QWidget):
                     f"</table>"
                 )
                 confirmation.setInformativeText(details)
-                
-                # Print receipt button
                 print_btn = confirmation.addButton("Print Receipt", QMessageBox.ActionRole)
                 confirmation.addButton(QMessageBox.Ok)
                 confirmation.setDefaultButton(QMessageBox.Ok)
-                
                 result = confirmation.exec_()
-                
-                # Handle print button click
                 if confirmation.clickedButton() == print_btn:
                     self.print_receipt(data)
-                
-                # Refresh the table with the new data
                 self.refresh_table()
-                
                 logger.info(f"[Sales] Added sale for customer: {data['customer']}, total: ${data['total']:.2f}, status: {data['status']}")
-                
+                # --- Add purchases to database ---
+                if self.purchases_controller and self.customer_controller:
+                    customer_name = data['customer']
+                    customer = self.customer_controller.get_customer_by_name(customer_name)
+                    if customer:
+                        customer_id = customer[0]
+                        sale_date = data['date']
+                        for item in self.cart:
+                            self.purchases_controller.add_purchase(
+                                customer_id=customer_id,
+                                product=item['name'],
+                                quantity=item['qty'],
+                                price=item['price'],
+                                total=item['qty'] * item['price'],
+                                date=sale_date
+                            )
+                    else:
+                        QMessageBox.warning(self, "Error", f"Customer '{customer_name}' not found.")
             except Exception as e:
                 logger.error(f"[Sales] Failed to process sale: {str(e)}")
                 show_error(self, f"Failed to process sale: {str(e)}")

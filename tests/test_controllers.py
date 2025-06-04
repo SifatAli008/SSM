@@ -2,8 +2,8 @@ import unittest
 from unittest.mock import Mock, patch
 from app.controllers.inventory_controller import InventoryController
 from app.controllers.sales_controller import SalesController
-# from app.controllers.user_controller import UserController  # Removed: file does not exist
-# from app.controllers.report_controller import ReportController  # Removed: file does not exist
+from app.controllers.user_controller import UserController
+from app.controllers.report_controller import ReportController
 from app.models.inventory import Inventory
 from app.models.sales import Sales
 from app.models.user import User
@@ -34,7 +34,7 @@ class TestInventoryController(unittest.TestCase):
     def test_update_product(self):
         """Test updating an existing product"""
         # Add product first
-        self.controller.add_product("Test Product", 10, 99.99, "Test")
+        self.controller.add_product(name="Test Product", quantity=10, price=99.99, category="Test")
         
         # Update product
         result = self.controller.update_product(
@@ -52,7 +52,7 @@ class TestInventoryController(unittest.TestCase):
     def test_delete_product(self):
         """Test deleting a product"""
         # Add product first
-        self.controller.add_product("Test Product", 10, 99.99, "Test")
+        self.controller.add_product(name="Test Product", quantity=10, price=99.99, category="Test")
         
         # Delete product
         result = self.controller.delete_product("Test Product")

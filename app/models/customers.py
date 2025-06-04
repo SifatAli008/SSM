@@ -45,3 +45,8 @@ class CustomersModel:
     def delete_customer(self, customer_id):
         self.conn.execute('''DELETE FROM customers WHERE id=?''', (customer_id,))
         self.conn.commit()
+
+    def get_customer_by_name(self, name):
+        cur = self.conn.cursor()
+        cur.execute('''SELECT * FROM customers WHERE name = ?''', (name,))
+        return cur.fetchone()

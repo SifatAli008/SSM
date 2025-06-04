@@ -76,7 +76,7 @@ class CardWidget(QFrame):
 
         title_label = QLabel(title)
         title_label.setObjectName("cardTitle")
-        title_label.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        title_label.setFont(QFont("Segoe UI", 16, QFont.Bold))
         title_layout.addWidget(title_label)
         title_layout.addStretch()
         layout.addLayout(title_layout)
@@ -85,7 +85,7 @@ class CardWidget(QFrame):
         # Value
         self.value_label = QLabel(str(value))
         self.value_label.setObjectName("cardValue")
-        self.value_label.setFont(QFont("Segoe UI", 22, QFont.Bold))
+        self.value_label.setFont(QFont("Segoe UI", 24, QFont.Bold))
         self.value_label.setStyleSheet("color: #3498db;")
         layout.addWidget(self.value_label)
 
@@ -95,15 +95,15 @@ class CardWidget(QFrame):
         if subtitle:
             self.subtitle_label = QLabel(subtitle)
             self.subtitle_label.setObjectName("cardSubtitle")
-            self.subtitle_label.setFont(QFont("Segoe UI", 11))
-            self.subtitle_label.setStyleSheet("color: #7f8c8d;")
+            self.subtitle_label.setFont(QFont("Segoe UI", 13))
+            self.subtitle_label.setStyleSheet("color: #7f8c8d; background-color: transparent;")
             layout.addWidget(self.subtitle_label)
         else:
             # Create an empty subtitle label to update later if needed
             self.subtitle_label = QLabel("")
             self.subtitle_label.setObjectName("cardSubtitle")
-            self.subtitle_label.setFont(QFont("Segoe UI", 11))
-            self.subtitle_label.setStyleSheet("color: #7f8c8d;")
+            self.subtitle_label.setFont(QFont("Segoe UI", 13))
+            self.subtitle_label.setStyleSheet("color: #7f8c8d; background-color: transparent;")
             self.subtitle_label.setVisible(False)
             layout.addWidget(self.subtitle_label)
 
@@ -135,8 +135,8 @@ class CardWidget(QFrame):
             # Create subtitle label if it doesn't exist
             self.subtitle_label = QLabel(subtitle)
             self.subtitle_label.setObjectName("cardSubtitle")
-            self.subtitle_label.setFont(QFont("Segoe UI", 11))
-            self.subtitle_label.setStyleSheet("color: #7f8c8d;")
+            self.subtitle_label.setFont(QFont("Segoe UI", 13))
+            self.subtitle_label.setStyleSheet("color: #7f8c8d; background-color: transparent;")
             self.layout().insertWidget(2, self.subtitle_label)
         elif self.subtitle_label:
             self.subtitle_label.setVisible(False)
@@ -195,6 +195,7 @@ class CardWidget(QFrame):
 
         QLabel#cardTitle {
             color: #2c3e50;
+            background-color: transparent;
         }
 
 
@@ -206,6 +207,7 @@ class CardWidget(QFrame):
 
         QLabel#cardSubtitle {
             color: #7f8c8d;
+            background-color: transparent;
         }
         """
         
@@ -220,16 +222,19 @@ class CardWidget(QFrame):
 
         QLabel#cardTitle {
             color: #2c3e50;
+            background-color: transparent;
         }
 
 
         QLabel#cardValue {
             color: #3498db;
+            background-color: transparent;
         }
 
 
         QLabel#cardSubtitle {
             color: #7f8c8d;
+            background-color: transparent;
         }
         """
         
@@ -244,15 +249,18 @@ class CardWidget(QFrame):
 
         QLabel#cardTitle {
             color: #2c3e50;
+            background-color: transparent;
         }
 
 
         QLabel#cardValue {
             color: #2980b9;
+            background-color: transparent;
         }
 
 
         QLabel#cardSubtitle {
             color: #7f8c8d;
+            background-color: transparent;
         }
         """

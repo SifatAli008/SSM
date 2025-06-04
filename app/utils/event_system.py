@@ -1,6 +1,7 @@
 from PyQt5.QtCore import QObject, pyqtSignal
 import logging
-from app.utils.logger import logger
+from app.utils.logger import Logger
+logger = Logger()
 
 class EventSystem(QObject):
     """

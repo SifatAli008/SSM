@@ -1,7 +1,8 @@
 import time
 from datetime import datetime, timedelta
 import threading
-from app.utils.logger import logger
+from app.utils.logger import Logger
+logger = Logger()
 
 class CacheEntry:
     """Class representing a single cached item"""

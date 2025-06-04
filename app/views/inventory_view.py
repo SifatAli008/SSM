@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer, QDateTime, QSortFilterProxyModel, pyqtSlot, QSize, QPropertyAnimation
 from PyQt5.QtGui import QFont, QIntValidator, QDoubleValidator, QIcon, QColor, QPixmap
 from app.views.widgets.components import Button  # Import our standardized Button component
+from app.views.widgets.reusable_shop_info_card import ReusableShopInfoCard, ShopCardPresets
 from app.utils.logger import Logger
 from datetime import datetime
 from app.views.widgets.snackbar import Snackbar
@@ -335,8 +336,7 @@ class InventoryView(QWidget):
     def create_info_cards(self, parent_layout):
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(20)
-        
-        # Create cards with improved styling and animations
+
         card_data = [
             {
                 "title": "Total Stock",
@@ -371,49 +371,24 @@ class InventoryView(QWidget):
                 "icon": "💰"
             }
         ]
-        
+
         self.card_labels = {}
-        
+
         for card in card_data:
-            frame = QFrame()
-            frame.setObjectName("cardFrame")
-            layout = QVBoxLayout(frame)
-            layout.setSpacing(10)
-            
-            # Add icon and title in a horizontal layout
-            header_layout = QHBoxLayout()
-            icon_label = QLabel(card["icon"])
-            icon_label.setStyleSheet(f"font-size: 24px; color: {card['color']};")
-            title = QLabel(card["title"])
-            title.setObjectName("cardTitle")
-            header_layout.addWidget(icon_label)
-            header_layout.addWidget(title)
-            header_layout.addStretch()
-            
-            value = QLabel(card["value"])
-            value.setObjectName("cardValue")
-            value.setStyleSheet(f"color: {card['color']};")
-            
-            desc = QLabel(card["description"])
-            desc.setObjectName("cardDescription")
-            
-            layout.addLayout(header_layout)
-            layout.addWidget(value)
-            layout.addWidget(desc)
-            
-            # Add hover effect
-            frame.setStyleSheet(f"""
-                #cardFrame {{
-                    background-color: white;
-                    border-radius: 12px;
-                    padding: 20px;
-                    border: 1px solid #e0e0e0;
-                }}
-            """)
-            
-            cards_layout.addWidget(frame)
-            self.card_labels[card["key"]] = {"widget": frame, "value": value, "desc": desc}
-        
+            widget = ReusableShopInfoCard({
+                "title": card["title"],
+                "color": card["color"],
+                "icon": card["icon"]
+            })
+            widget.update_values(value=card["value"], subtitle=card["description"], color=card["color"])
+            widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            self.card_labels[card["key"]] = {
+                "widget": widget,
+                "value": widget.value_label,
+                "desc": widget.subtitle_label
+            }
+            cards_layout.addWidget(widget)
+
         parent_layout.addLayout(cards_layout)
 
     def create_table_section(self):
@@ -600,7 +575,6 @@ class InventoryView(QWidget):
         try:
             # Remove SQL setFilter and select calls (not supported in Firebase model)
             # self.controller.model.setFilter("")
-            # self.controller.model.select()
             # Create a proxy model for advanced filtering
             self.proxy_model = QSortFilterProxyModel()
             self.proxy_model.setSourceModel(self.controller.model)
@@ -713,6 +687,7 @@ class InventoryView(QWidget):
                 self.proxy_model.setFilterFixedString("")
         # Update info cards after refresh
         self.update_info_cards()
+        logger.info(f"[{self.user_role}] Refreshed inventory view")
 
     def on_table_clicked(self, index):
         self.selected_row = self.proxy_model.mapToSource(index).row()
@@ -761,6 +736,7 @@ class InventoryView(QWidget):
                     selling_price=selling_price
                 )
                 if success:
+                    logger.info(f"[{self.user_role}] Added product: {name}, qty={stock}, category={category}")
                     self.refresh_from_controller()
                     QMessageBox.information(self, "Success", f"Product '{name}' added successfully!")
                 else:
@@ -845,6 +821,7 @@ class InventoryView(QWidget):
             if hasattr(self.controller, 'update_item'):
                 success = self.controller.update_item(self.selected_row, updated_data, additional_data)
                 if success:
+                    logger.info(f"[{self.user_role}] Edited product: {name} (row {self.selected_row})")
                     self.refresh_from_controller()
                     QMessageBox.information(self, "Success", f"Product updated successfully!")
                 else:
@@ -876,6 +853,7 @@ class InventoryView(QWidget):
                 item_data = [self.controller.model.data(self.controller.model.index(row, col)) for col in range(self.controller.model.columnCount())]
                 self.last_deleted_items.append((row, item_data))
                 self.controller.delete_item(row)
+                logger.info(f"[{self.user_role}] Deleted product at row {row}")
             self.selected_row = -1
             self.edit_button.setEnabled(False)
             self.delete_button.setEnabled(False)
@@ -896,6 +874,7 @@ class InventoryView(QWidget):
             try:
                 success, count = self.controller.export_inventory_to_csv(file_path)
                 if success:
+                    logger.info(f"[{self.user_role}] Exported inventory to CSV: {file_path} ({count} products)")
                     QMessageBox.information(self, "Success", f"Exported {count} products to CSV successfully!")
                 else:
                     show_error(self, "Failed to export inventory to CSV.")

@@ -3,7 +3,9 @@ from datetime import datetime
 from threading import Thread, Event
 from queue import Queue
 import time
-from app.utils.logger import logger
+from app.utils.logger import Logger
+
+logger = Logger()
 
 class EventSystem:
     def __init__(self):

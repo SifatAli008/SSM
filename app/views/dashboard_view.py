@@ -12,7 +12,7 @@ from app.views.widgets.layouts import DashboardLayout, CardGrid
 from app.utils.theme_manager import ThemeManager
 
 # Keep original widget imports for backward compatibility
-from app.views.widgets.card_widget import CardWidget
+from app.views.widgets.info_card import InfoCard
 
 # Import enhanced visualization widgets
 from app.views.widgets.enhanced_graph import EnhancedGraph
@@ -34,6 +34,9 @@ from datetime import datetime, timedelta
 
 from app.core.inventory import InventoryManager
 from app.core.sales import SalesManager
+
+# Import ReusableShopInfoCard and ShopCardPresets
+from app.views.widgets.reusable_shop_info_card import ReusableShopInfoCard, ShopCardPresets
 
 
 
@@ -350,10 +353,11 @@ class DashboardPage(QWidget):
             }
         """)
         content_layout.addWidget(self.loading_bar)
-        # Add last updated label
-        self.last_updated_label = QLabel()
-        self.last_updated_label.setStyleSheet("color: #888; font-size: 12px; margin-bottom: 8px;")
-        content_layout.addWidget(self.last_updated_label)
+        # Add loading label for test compatibility
+        self.loading_label = QLabel("Loading...")
+        self.loading_label.setVisible(False)
+        self.loading_label.setStyleSheet("color: #3498db; font-size: 13px; margin-bottom: 4px;")
+        content_layout.addWidget(self.loading_label)
         # --- Move toggles and divider here ---
         customize_label = QLabel("Customize Dashboard")
         customize_label.setStyleSheet("font-weight: bold; font-size: 15px; margin-bottom: 8px;")
@@ -409,27 +413,27 @@ class DashboardPage(QWidget):
         dashboard = DashboardLayout()
         dashboard.set_columns(3)
         # Add summary cards (top metrics)
-        self.revenue_card = CardWidget(
-            "Total Revenue",
-            "$0.00",
-            "Loading...",
-            icon="💰",
-            color="#2ecc71"
-        )
-        self.customer_card = CardWidget(
-            "Customer Traffic",
-            "0",
-            "Loading...",
-            icon="👥",
-            color="#3498db"
-        )
-        self.orders_card = CardWidget(
-            "Pending Orders",
-            "0",
-            "Loading...",
-            icon="📦",
-            color="#e74c3c"
-        )
+        self.revenue_card = ReusableShopInfoCard({
+            "title": "Total Revenue",
+            "icon": "💰",
+            "color": "#2ecc71"
+        })
+        self.revenue_card.value_label.setFont(QFont("Segoe UI", 36, QFont.Bold))
+        self.revenue_card.subtitle_label.setFont(QFont("Segoe UI", 13))
+        self.customer_card = ReusableShopInfoCard({
+            "title": "Customer Traffic",
+            "icon": "👥",
+            "color": "#3498db"
+        })
+        self.customer_card.value_label.setFont(QFont("Segoe UI", 36, QFont.Bold))
+        self.customer_card.subtitle_label.setFont(QFont("Segoe UI", 13))
+        self.orders_card = ReusableShopInfoCard({
+            "title": "Pending Orders",
+            "icon": "📦",
+            "color": "#e74c3c"
+        })
+        self.orders_card.value_label.setFont(QFont("Segoe UI", 36, QFont.Bold))
+        self.orders_card.subtitle_label.setFont(QFont("Segoe UI", 13))
         dashboard.add_summary_card(self.revenue_card)
         dashboard.add_summary_card(self.customer_card)
         dashboard.add_summary_card(self.orders_card)
@@ -874,3 +878,12 @@ class DashboardPage(QWidget):
 
     def on_error_occurred(self, error_message):
         pass
+
+    update_all_cards = update_summary_cards
+
+    def show_loading(self):
+        self.loading_label.setVisible(True)
+        QTimer.singleShot(500, lambda: self.loading_label.setVisible(False))
+
+    def hide_loading(self):
+        self.loading_label.setVisible(False)

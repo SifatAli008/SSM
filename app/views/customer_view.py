@@ -1,20 +1,23 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTableWidget, QTableWidgetItem, QPushButton, QDialog, 
     QFormLayout, QMessageBox, QHeaderView, QComboBox, QFrame, QTabWidget, QTextEdit, QDateEdit, QCheckBox,
-    QRadioButton, QButtonGroup, QSpinBox, QSplitter, QGroupBox, QGridLayout, QDoubleSpinBox
+    QRadioButton, QButtonGroup, QSpinBox, QSplitter, QGroupBox, QGridLayout, QDoubleSpinBox, QStyledItemDelegate, QSizePolicy, QVBoxLayout,
+    QAbstractItemView
 )
-from PyQt5.QtCore import Qt, QDate, QTime
+from PyQt5.QtCore import Qt, QDate, QTime, QTimer
 from PyQt5.QtGui import QFont, QColor, QIcon
-from app.views.widgets.card_widget import CardWidget
+from app.views.widgets.info_card import InfoCard
 from app.views.widgets.action_button import ActionButton
 from app.utils.ui_helpers import show_error
+from app.views.widgets.components import TableComponent, Button
+from app.views.widgets.reusable_shop_info_card import ReusableShopInfoCard, ShopCardPresets
 
 class CustomerDialog(QDialog):
     def __init__(self, parent=None, customer=None):
         super().__init__(parent)
         self.setWindowTitle("Add/Edit Customer")
-        self.setMinimumWidth(500)
-        self.setMinimumHeight(450)
+        self.setMinimumWidth(380)
+        self.setMinimumHeight(320)
         self.customer = customer
         
         main_layout = QVBoxLayout(self)
@@ -133,8 +136,8 @@ class BillingDialog(QDialog):
     def __init__(self, parent=None, customer=None):
         super().__init__(parent)
         self.setWindowTitle("Customer Billing")
-        self.setMinimumWidth(800)
-        self.setMinimumHeight(600)
+        self.setMinimumWidth(520)
+        self.setMinimumHeight(400)
         self.customer = customer
         
         self.init_ui()
@@ -381,398 +384,340 @@ class BillingDialog(QDialog):
             "products": products
         }
 
-class CustomerView(QWidget):
-    def __init__(self, parent=None, controller=None):
-        super().__init__(parent)
-        self.controller = controller
-        self.selected_row = None
-        self.init_ui()
-        self.refresh_table()
+class CustomerDetailsDialog(QDialog):
+    def __init__(self, customer):
+        super().__init__()
+        self.setWindowTitle("Customer Details")
+        self.setMinimumWidth(600)
+        layout = QVBoxLayout(self)
+        tabs = QTabWidget()
+        # --- Information Tab ---
+        info_tab = QWidget()
+        info_layout = QVBoxLayout(info_tab)
+        # Info fields
+        info_box = QFrame()
+        info_box.setStyleSheet("border:1.5px solid #e5e7eb; border-radius:8px;")
+        form = QFormLayout(info_box)
+        form.addRow("Name", QLabel(customer["name"]))
+        form.addRow("Email", QLabel(customer["email"]))
+        form.addRow("Phone", QLabel(customer["phone"]))
+        form.addRow("Address", QLabel(customer["address"]))
+        status = QLabel(customer["status"])
+        status.setStyleSheet("background:#e0f7ef; color:#16a34a; border-radius:8px; padding:2px 10px;")
+        form.addRow("Status", status)
+        info_layout.addWidget(info_box)
+        # Summary cards
+        cards = QHBoxLayout()
+        for label, value in [
+            ("Total Orders", customer["orders"]),
+            ("Total Spent", f"${customer['spent']:.2f}"),
+            ("Avg Order", f"${customer['spent']/customer['orders']:.2f}")
+        ]:
+            card = StatCard(label, value, "👥", "#222")
+            cards.addWidget(card)
+        info_layout.addLayout(cards)
+        tabs.addTab(info_tab, "Information")
+        # --- Purchase History Tab ---
+        history_tab = QWidget()
+        history_layout = QVBoxLayout(history_tab)
+        # Example orders
+        orders = [
+            {"id": "ORD-001", "date": "1/15/2024", "items": 2, "total": 299.99},
+            {"id": "ORD-002", "date": "1/10/2024", "items": 1, "total": 149.99},
+            {"id": "ORD-003", "date": "1/5/2024", "items": 3, "total": 799.99},
+        ]
+        for o in orders:
+            order_box = QFrame()
+            order_box.setStyleSheet("border:1.5px solid #e5e7eb; border-radius:8px; margin-bottom:8px;")
+            order_layout = QHBoxLayout(order_box)
+            order_layout.addWidget(QLabel(f"{o['id']}\n{o['date']} • {o['items']} items"))
+            order_layout.addStretch()
+            total = QLabel(f"${o['total']:.2f}")
+            total.setStyleSheet("font-weight:bold; font-size:18px;")
+            order_layout.addWidget(total)
+            history_layout.addWidget(order_box)
+        tabs.addTab(history_tab, "Purchase History")
+        layout.addWidget(tabs)
 
-    def init_ui(self):
-        self.setStyleSheet('''
-            QWidget { 
-                background-color: #f5f6fa; 
-                color: #2c3e50; 
-                font-family: 'Segoe UI', Arial, sans-serif; 
-            }
+class StatCard(QFrame):
+    def __init__(self, title, value, icon, color="#222"):
+        super().__init__()
+        self.setStyleSheet("""
             QFrame { 
-                border-radius: 8px; 
-                background-color: white; 
-                border: 1px solid #e0e0e0; 
+                background: #fff;
+                border-radius: 16px;
+                border: 1px solid #eee;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             }
-            QPushButton.action { 
-                background-color: #3498db; 
-                color: white; 
-                border-radius: 4px; 
-                padding: 8px 16px; 
-                font-size: 13px; 
-                font-weight: bold; 
+        """)
+        layout = QHBoxLayout(self)
+        icon_label = QLabel(icon)
+        icon_label.setStyleSheet(f"font-size: 32px; color: {color};")
+        layout.addWidget(icon_label)
+        text_layout = QVBoxLayout()
+        label = QLabel(title)
+        label.setStyleSheet("color:#888; font-size:15px;")
+        value_label = QLabel(str(value))
+        value_label.setStyleSheet(f"font-size:32px; font-weight:bold; color:{color};")
+        text_layout.addWidget(label)
+        text_layout.addWidget(value_label)
+        layout.addLayout(text_layout)
+
+class Badge(QLabel):
+    def __init__(self, text, color):
+        super().__init__(text)
+        self.setStyleSheet(f"background:{color}; color:#fff; border-radius:8px; padding:2px 12px; font-weight:bold;")
+
+class CustomerManagementView(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background:#f8fafc;")
+        main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+
+        # Header
+        header = QLabel("Customer Management")
+        header.setFont(QFont("Segoe UI", 24, QFont.Bold))
+        subheader = QLabel("Manage your customer relationships and purchase history")
+        subheader.setStyleSheet("color:#888; font-size:15px;")
+        main_layout.addWidget(header)
+        main_layout.addWidget(subheader)
+
+        # --- Summary Cards Row (restored) ---
+        self.card_labels = {}
+        self.card_definitions = [
+            {
+                "title": "Total Customers",
+                "default_value": "0",
+                "description": "Updated just now",
+                "color": "#2563eb",
+                "key": "total",
+                "icon": "👥"
+            },
+            {
+                "title": "Active Customers",
+                "default_value": "0",
+                "description": "Currently active",
+                "color": "#16a34a",
+                "key": "active",
+                "icon": "🟢"
+            },
+            {
+                "title": "Total Revenue",
+                "default_value": "$0",
+                "description": "All-time revenue",
+                "color": "#f59e42",
+                "key": "revenue",
+                "icon": "💰"
+            },
+            {
+                "title": "Avg Order Value",
+                "default_value": "$0",
+                "description": "Average per order",
+                "color": "#222",
+                "key": "avg_order",
+                "icon": "📦"
             }
-            QPushButton.action:hover { 
-                background-color: #2980b9; 
+        ]
+        cards_layout = QHBoxLayout()
+        cards_layout.setSpacing(20)
+        for card in self.card_definitions:
+            widget = ReusableShopInfoCard({
+                "title": card["title"],
+                "color": card["color"],
+                "icon": card["icon"]
+            })
+            widget.value_label.setFont(QFont("Segoe UI", 36, QFont.Bold))
+            widget.subtitle_label.setFont(QFont("Segoe UI", 13))
+            widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            widget.value_label.setStyleSheet(f"color: {card['color']};")
+            self.card_labels[card["key"]] = {
+                "widget": widget,
+                "value": widget.value_label,
+                "desc": widget.subtitle_label
             }
-            QLabel.title { 
-                color: #2c3e50; 
-                font-size: 18px; 
-                font-weight: bold; 
-                padding: 10px 0; 
-            }
-            QTableWidget { 
-                border: none; 
-                background-color: white; 
-                gridline-color: #ecf0f1;
-            }
-            QTableWidget::item { 
-                padding: 4px; 
-                border-bottom: 1px solid #ecf0f1;
-            }
-            QTableWidget::item:selected { 
-                background-color: #d5e8f8; 
-                color: #2c3e50; 
-            }
-            QHeaderView::section { 
-                background-color: #f8f9fa; 
-                color: #2c3e50; 
-                padding: 8px 4px; 
-                border: none; 
-                border-bottom: 1px solid #ddd; 
-                font-weight: bold; 
-            }
-            QLineEdit { 
-                padding: 8px; 
-                border-radius: 4px; 
-                border: 1px solid #dcdde1; 
-                background-color: white; 
-            }
-            QLineEdit:focus { 
-                border: 1px solid #3498db; 
-            }
-            QPushButton#perch { 
-                background-color: #2ecc71; 
-                color: white; 
-                border-radius: 4px; 
-                padding: 10px 24px; 
-                font-weight: bold; 
-            }
-            QPushButton#cancel { 
-                background-color: #e74c3c; 
-                color: white; 
-                border-radius: 4px; 
-                padding: 10px 24px; 
-                font-weight: bold; 
-            }
-            QPushButton#back {
-                background-color: #3498db;
-                color: white;
-                border-radius: 4px;
-                padding: 6px 12px;
-                font-weight: bold;
+            cards_layout.addWidget(widget)
+        main_layout.addLayout(cards_layout)
+        self.setup_auto_refresh()
+
+        # --- Card container for search and table (Inventory style) ---
+        table_card = QFrame()
+        table_card.setObjectName("cardFrame")
+        table_card.setStyleSheet('''
+            QFrame#cardFrame {
+                background: #fff;
+                border-radius: 12px;
+                border: 1.5px solid #e0e0e0;
+                padding: 0;
             }
         ''')
-        
-        main_layout = QVBoxLayout(self)
-        main_layout.setSpacing(15)
-        main_layout.setContentsMargins(15, 15, 15, 15)
+        table_layout = QVBoxLayout(table_card)
+        table_layout.setContentsMargins(0, 0, 0, 0)
+        table_layout.setSpacing(0)
 
-        # Top section - Customer traffic and purchase history
-        top_section = QHBoxLayout()
-        top_section.setSpacing(15)
-        
-        # Customer Traffic Card - Simple version
-        traffic_frame = QFrame()
-        traffic_layout = QVBoxLayout(traffic_frame)
-        
-        traffic_title = QLabel("Customer Traffic")
-        traffic_title.setFont(QFont('Segoe UI', 13))
-        traffic_title.setStyleSheet("color: #34495e;")
-        traffic_layout.addWidget(traffic_title)
-        
-        traffic_count = QLabel("320")
-        traffic_count.setFont(QFont('Segoe UI', 32, QFont.Bold))
-        traffic_count.setStyleSheet("color: #3498db;")
-        traffic_layout.addWidget(traffic_count)
-        
-        traffic_peak = QLabel("Peak Hour: 5-6 PM")
-        traffic_peak.setStyleSheet("color: #7f8c8d;")
-        traffic_layout.addWidget(traffic_peak)
-        
-        top_section.addWidget(traffic_frame, 1)
-        
-        # Purchase History section
-        history_frame = QFrame()
-        history_layout = QVBoxLayout(history_frame)
-        
-        history_title = QLabel("Purchase History")
-        history_title.setFont(QFont('Segoe UI', 16, QFont.Bold))
-        history_layout.addWidget(history_title)
-        
-        self.history_table = QTableWidget(0, 5)
-        self.history_table.setHorizontalHeaderLabels([
-            "Order Number", "Time/Date", "Name", "Address", "Contact"
-        ])
-        self.history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.history_table.setAlternatingRowColors(True)
-        self.history_table.verticalHeader().setVisible(True)  # Show row numbers
-        
-        history_layout.addWidget(self.history_table)
-        
-        top_section.addWidget(history_frame, 3)
-        
-        main_layout.addLayout(top_section)
-        
-        # Main customer management section
-        management_frame = QFrame()
-        management_layout = QVBoxLayout(management_frame)
-        management_layout.setContentsMargins(15, 15, 15, 15)
-        
-        # Search bar
-        search_layout = QHBoxLayout()
+        # --- Search bar styled as customer sales page ---
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Search Bar")
-        self.search_input.textChanged.connect(self.refresh_table)
-        self.search_input.setStyleSheet("margin-bottom: 15px;")
-        search_layout.addWidget(self.search_input)
-        
-        management_layout.addLayout(search_layout)
-        
-        # Customer table
-        self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels([
-            "Serial", "Customer Name", "Product name", "Product Quantity", 
-            "ProductPrice", "Total Price"
+        self.search_input.setPlaceholderText('Search by name, email, or phone...')
+        self.search_input.setMinimumHeight(36)
+        self.search_input.setStyleSheet('''
+            QLineEdit {
+                background: #fff;
+                border: 1.5px solid #e0e0e0;
+                border-radius: 8px;
+                font-size: 15px;
+                padding: 8px 12px;
+            }
+            QLineEdit:focus {
+                border: 1.5px solid #2563eb;
+                outline: none;
+            }
+        ''')
+        self.search_input.textChanged.connect(lambda: self.refresh_table())
+        table_layout.addWidget(self.search_input)
+
+        # --- Customer Table (Inventory style) ---
+        self.customer_table_view = QTableWidget()
+        self.customer_table_view.setColumnCount(7)
+        self.customer_table_view.setHorizontalHeaderLabels([
+            "Customer", "Contact", "Total Orders", "Total Spent", "Last Purchase", "Status", "Actions"
         ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setAlternatingRowColors(True)
-        self.table.clicked.connect(self.on_table_clicked)
-        self.table.verticalHeader().setVisible(True)  # Show row numbers
-        
-        management_layout.addWidget(self.table)
-        
-        # Pagination
-        pagination = QHBoxLayout()
-        pagination.addStretch()
-        pagination_label = QLabel("< 1 - 3 >")
-        pagination_label.setStyleSheet("color: #7f8c8d;")
-        pagination.addWidget(pagination_label)
-        pagination.addStretch()
-        management_layout.addLayout(pagination)
-        
-        # Table action buttons
-        button_layout = QHBoxLayout()
+        self.customer_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.customer_table_view.setAlternatingRowColors(True)
+        self.customer_table_view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.customer_table_view.setSelectionMode(QAbstractItemView.MultiSelection)
+        self.customer_table_view.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.customer_table_view.setStyleSheet('''
+            QTableWidget {
+                background: #fff;
+                border-radius: 8px;
+                border: 1.5px solid #e0e0e0;
+                font-size: 14px;
+                selection-background-color: #e3f2fd;
+                selection-color: #1976d2;
+                gridline-color: #e0e0e0;
+                alternate-background-color: #f9f9f9;
+            }
+            QHeaderView::section {
+                background-color: #f8f9fa;
+                padding: 12px 8px;
+                border: none;
+                border-bottom: 2px solid #e0e0e0;
+                font-weight: bold;
+                color: #2c3e50;
+            }
+            QTableWidget::item {
+                padding: 8px;
+                border-bottom: 1px solid #f0f0f0;
+            }
+            QTableWidget::item:selected {
+                background-color: #e3f2fd;
+                color: #1976d2;
+            }
+            QTableWidget::item:hover {
+                background-color: #f5f5f5;
+            }
+        ''')
+        table_layout.addWidget(self.customer_table_view)
+
+        # --- Only one action button below the table ---
+        button_container = QFrame()
+        button_container.setStyleSheet('''
+            QFrame {
+                background-color: #f8f9fa;
+                border-top: 1px solid #e0e0e0;
+                border-radius: 0 0 12px 12px;
+            }
+        ''')
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(15, 15, 15, 15)
+        button_layout.setSpacing(10)
+        self.view_history_button = Button("View Purchase History", variant="primary")
         button_layout.addStretch()
-        
-        # Use cleaner, more modern button styling
-        self.add_btn = QPushButton("Add")
-        self.add_btn.setStyleSheet("""
-            background-color: #3498db; 
-            color: white; 
-            border-radius: 4px; 
-            padding: 8px 20px;
-        """)
-        self.add_btn.clicked.connect(self.add_billing)
-        
-        self.edit_btn = QPushButton("Update")
-        self.edit_btn.setStyleSheet("""
-            background-color: #f39c12; 
-            color: white; 
-            border-radius: 4px; 
-            padding: 8px 20px;
-        """)
-        self.edit_btn.clicked.connect(self.edit_billing)
-        
-        self.delete_btn = QPushButton("Delete")
-        self.delete_btn.setStyleSheet("""
-            background-color: #e74c3c; 
-            color: white; 
-            border-radius: 4px; 
-            padding: 8px 20px;
-        """)
-        self.delete_btn.clicked.connect(self.delete_customer)
-        
-        button_layout.addWidget(self.add_btn)
-        button_layout.addWidget(self.edit_btn)
-        button_layout.addWidget(self.delete_btn)
-        
-        management_layout.addLayout(button_layout)
-        management_layout.addSpacing(20)
-        
-        # Invoice forms section - Improved layout
-        invoice_title = QLabel("Invoices Number:")
-        invoice_title.setFont(QFont('Segoe UI', 13))
-        management_layout.addWidget(invoice_title)
-        
-        invoice_layout = QHBoxLayout()
-        invoice_layout.setSpacing(20)
-        
-        # Left column - Invoice info - Match reference UI
-        left_form = QVBoxLayout()
-        left_form.setSpacing(10)
-        
-        self.invoice_date = QLineEdit()
-        self.invoice_date.setPlaceholderText("Date")
-        left_form.addWidget(self.invoice_date)
-        
-        self.invoice_name = QLineEdit()
-        self.invoice_name.setPlaceholderText("Name")
-        left_form.addWidget(self.invoice_name)
-        
-        self.invoice_address = QLineEdit()
-        self.invoice_address.setPlaceholderText("Address")
-        left_form.addWidget(self.invoice_address)
-        
-        invoice_layout.addLayout(left_form, 1)
-        
-        # Center column
-        center_form = QVBoxLayout()
-        center_form.setSpacing(10)
-        
-        self.invoice_order = QLineEdit()
-        self.invoice_order.setPlaceholderText("Order Number")
-        center_form.addWidget(self.invoice_order)
-        
-        self.invoice_contract = QLineEdit()
-        self.invoice_contract.setPlaceholderText("Contract")
-        center_form.addWidget(self.invoice_contract)
-        
-        # Add empty space to match reference UI's 3-field vertical alignment
-        center_form.addStretch()
-        
-        invoice_layout.addLayout(center_form, 1)
-        
-        # Right column - Price info - Match reference UI
-        right_form = QVBoxLayout()
-        right_form.setSpacing(10)
-        
-        self.invoice_total = QLineEdit()
-        self.invoice_total.setPlaceholderText("Total Price")
-        right_form.addWidget(self.invoice_total)
-        
-        self.invoice_discount = QLineEdit()
-        self.invoice_discount.setPlaceholderText("After Discount")
-        self.invoice_discount.setText("0.00")
-        right_form.addWidget(self.invoice_discount)
-        
-        self.invoice_payment = QLineEdit()
-        self.invoice_payment.setPlaceholderText("Payment")
-        self.invoice_payment.setText("0.00") 
-        right_form.addWidget(self.invoice_payment)
-        
-        self.invoice_due = QLineEdit()
-        self.invoice_due.setPlaceholderText("Due")
-        right_form.addWidget(self.invoice_due)
-        
-        invoice_layout.addLayout(right_form, 1)
-        
-        management_layout.addLayout(invoice_layout)
-        
-        # Invoice action buttons - Align to right as in reference
-        invoice_buttons = QHBoxLayout()
-        invoice_buttons.addStretch()
-        
-        self.perch_btn = QPushButton("Perch")
-        self.perch_btn.setObjectName("perch")
-        self.perch_btn.clicked.connect(self.perch_invoice)
-        
-        self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.setObjectName("cancel")
-        self.cancel_btn.clicked.connect(self.clear_invoice_forms)
-        
-        invoice_buttons.addWidget(self.perch_btn)
-        invoice_buttons.addWidget(self.cancel_btn)
-        
-        management_layout.addLayout(invoice_buttons)
-        
-        main_layout.addWidget(management_frame)
+        button_layout.addWidget(self.view_history_button)
+        button_layout.addStretch()
+        table_layout.addWidget(button_container)
+        main_layout.addWidget(table_card)
+
+        # Remove all table action buttons (icons in the Actions column)
+        # Remove all other action buttons (Add, Edit, Delete, Export, Refresh, Show All)
+        # Only keep the 'View Purchase History' button below the table
+
+    def show_customer_details(self, customer):
+        dialog = CustomerDetailsDialog(customer)
+        dialog.exec_()
         
     def refresh_table(self):
-        # Clear existing data
-        self.table.setRowCount(0)
-        
-        # Dummy data for the main product table
-        products = [
-            {"serial": "1", "customer": "John Doe", "product": "Laptop", "quantity": "1", 
-             "price": "1200.00", "total": "1200.00"},
-            {"serial": "2", "customer": "Jane Smith", "product": "Phone", "quantity": "2", 
-             "price": "800.00", "total": "1600.00"},
-            {"serial": "3", "customer": "Bob Johnson", "product": "Keyboard", "quantity": "3", 
-             "price": "50.00", "total": "150.00"},
-        ]
-        
-        # Filter based on search
-        search = self.search_input.text().lower()
-        if search:
-            filtered = [p for p in products if search in p["customer"].lower() or 
-                                              search in p["product"].lower()]
-        else:
-            filtered = products
-        
-        # Update table
-        self.table.setRowCount(len(filtered))
-        for row, product in enumerate(filtered):
-            # Apply alternating row colors
-            if row % 2 == 0:
-                row_color = QColor("#f2f6fc")  # Light blue for even rows
-            else:
-                row_color = QColor("#ffffff")  # White for odd rows
-                
-            self.table.setItem(row, 0, QTableWidgetItem(product["serial"]))
-            self.table.setItem(row, 1, QTableWidgetItem(product["customer"]))
-            self.table.setItem(row, 2, QTableWidgetItem(product["product"]))
-            self.table.setItem(row, 3, QTableWidgetItem(product["quantity"]))
-            self.table.setItem(row, 4, QTableWidgetItem(product["price"]))
-            self.table.setItem(row, 5, QTableWidgetItem(product["total"]))
-            
-            # Apply the row color
-            for col in range(6):
-                item = self.table.item(row, col)
-                if item:
-                    item.setBackground(row_color)
-        
-        # Refresh history table
+        self.customer_table_view.setRowCount(0)
+        if not self.controller:
+            return
+        search = self.search_input.text()
+        customers = self.controller.get_customers(search)
+        self.customer_table_view.setRowCount(len(customers))
+        for row, customer in enumerate(customers):
+            # customer: (id, name, contact, address, history, created_at)
+            name_item = QTableWidgetItem(str(customer[1]))
+            name_item.setToolTip(str(customer[1]))
+            name_item.setFont(QFont('Segoe UI', 15))
+            name_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+            self.customer_table_view.setItem(row, 0, name_item)
+            contact_item = QTableWidgetItem(str(customer[2]))
+            contact_item.setToolTip(str(customer[2]))
+            contact_item.setFont(QFont("Consolas", 15))
+            contact_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+            self.customer_table_view.setItem(row, 1, contact_item)
+            orders_item = QTableWidgetItem("-")
+            orders_item.setToolTip("-")
+            orders_item.setTextAlignment(Qt.AlignCenter)
+            self.customer_table_view.setItem(row, 2, orders_item)
+            spent_item = QTableWidgetItem("-")
+            spent_item.setToolTip("-")
+            spent_item.setTextAlignment(Qt.AlignCenter)
+            self.customer_table_view.setItem(row, 3, spent_item)
+            last_item = QTableWidgetItem("-")
+            last_item.setToolTip("-")
+            last_item.setTextAlignment(Qt.AlignCenter)
+            self.customer_table_view.setItem(row, 4, last_item)
+            # Status badge (default to active)
+            status_widget = QWidget()
+            status_layout = QHBoxLayout(status_widget)
+            status_layout.setContentsMargins(0,0,0,0)
+            badge_icon = "🟢"
+            badge_color = "#16a34a"
+            badge_bg = "#16a34a"
+            badge = QLabel(f"<span style='font-size:18px;'>{badge_icon}</span> <b>Active</b>")
+            badge.setStyleSheet(f"background:{badge_bg}; color:#fff; border-radius: 12px; padding: 4px 18px; font-weight:bold; font-size:15px;")
+            status_layout.addWidget(badge)
+            status_layout.addStretch()
+            self.customer_table_view.setCellWidget(row, 5, status_widget)
+            # Modern action buttons
+            actions_widget = QWidget()
+            actions_layout = QHBoxLayout(actions_widget)
+            actions_layout.setContentsMargins(0,0,0,0)
+            actions_layout.setSpacing(4)
+            actions_widget.setMinimumHeight(32)
+            actions_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            for icon, _, color in [
+                ("👁", "View", "#2563eb"),
+                ("✏️", "Edit", "#f39c12"),
+                ("🗑", "Delete", "#e74c3c")
+            ]:
+                btn = QPushButton()
+                btn.setFixedSize(24, 24)
+                btn.setStyleSheet(f"background: {color}; border-radius: 12px; color: #fff; border: none; font-size:15px; padding:0;")
+                btn.setText(icon)
+                actions_layout.addWidget(btn)
+            actions_layout.setAlignment(Qt.AlignCenter)
+            self.customer_table_view.setCellWidget(row, 6, actions_widget)
         self.refresh_history_table()
-    
-    def refresh_history_table(self):
-        # Clear existing data
-        self.history_table.setRowCount(0)
-        
-        # Dummy history data - match reference UI
-        history = [
-            {"order": "ORD-001", "date": "2024-06-01 10:15", "name": "John Doe", 
-             "address": "123 Main St", "contact": "555-1234"},
-            {"order": "ORD-002", "date": "2024-06-02 14:30", "name": "Jane Smith", 
-             "address": "456 Oak Ave", "contact": "555-5678"},
-        ]
-        
-        self.history_table.setRowCount(len(history))
-        for row, order in enumerate(history):
-            # Apply alternating row colors for better readability
-            if row % 2 == 0:
-                row_color = QColor("#ebf5fb")  # Light blue
-            else:
-                row_color = QColor("#ffffff")  # White
-                
-            self.history_table.setItem(row, 0, QTableWidgetItem(order["order"]))
-            self.history_table.setItem(row, 1, QTableWidgetItem(order["date"]))
-            self.history_table.setItem(row, 2, QTableWidgetItem(order["name"]))
-            self.history_table.setItem(row, 3, QTableWidgetItem(order["address"]))
-            self.history_table.setItem(row, 4, QTableWidgetItem(order["contact"]))
-            
-            # Apply the row color
-            for col in range(5):
-                item = self.history_table.item(row, col)
-                if item:
-                    item.setBackground(row_color)
 
     def on_table_clicked(self):
-        self.selected_row = self.table.currentRow()
+        self.selected_row = self.customer_table_view.currentRow()
         if self.selected_row >= 0:
             # Highlight the selected row with a distinctive color
-            for row in range(self.table.rowCount()):
-                for col in range(self.table.columnCount()):
-                    item = self.table.item(row, col)
+            for row in range(self.customer_table_view.rowCount()):
+                for col in range(self.customer_table_view.columnCount()):
+                    item = self.customer_table_view.item(row, col)
                     if row == self.selected_row:
                         item.setBackground(QColor("#d4e6f1"))  # Light blue for selected row
                     else:
@@ -783,8 +728,8 @@ class CustomerView(QWidget):
                             item.setBackground(QColor("#ffffff"))
             
             # Fill invoice form with selected data
-            self.invoice_name.setText(self.table.item(self.selected_row, 1).text())
-            self.invoice_total.setText(self.table.item(self.selected_row, 5).text())
+            self.invoice_name.setText(self.customer_table_view.item(self.selected_row, 1).text())
+            self.invoice_total.setText(self.customer_table_view.item(self.selected_row, 4).text())
             
             # Set other fields to empty or default values
             current_date = QDate.currentDate().toString("yyyy-MM-dd")
@@ -794,13 +739,20 @@ class CustomerView(QWidget):
             self.invoice_contract.setText("")
             self.invoice_discount.setText("0.00")
             self.invoice_payment.setText("0.00")
-            self.invoice_due.setText(self.table.item(self.selected_row, 5).text())
+            self.invoice_due.setText(self.customer_table_view.item(self.selected_row, 4).text())
+            self.refresh_history_table()
 
     def add_customer(self):
         dialog = CustomerDialog(self)
         if dialog.exec_():
             data = dialog.get_data()
-            # TODO: Save to model/controller
+            self.controller.add_customer(
+                name=data['name'],
+                contact=data['contact'],
+                address=data['address'],
+                history=data.get('notes', ''),
+                created_at=QDate.currentDate().toString("yyyy-MM-dd")
+            )
             QMessageBox.information(self, "Customer Added", f"Customer {data['name']} added.")
             self.refresh_table()
 
@@ -808,18 +760,24 @@ class CustomerView(QWidget):
         if self.selected_row is None:
             show_error(self, "Select a customer to edit.", title="No Selection")
             return
-            
-        # Get data from table
+        customer_id = int(self.customer_table_view.item(self.selected_row, 0).text())
         cust = {
-            'name': self.table.item(self.selected_row, 1).text(),
-            'type': 'Regular',  # Default
-            'notes': ''  # Default
+            'name': self.customer_table_view.item(self.selected_row, 1).text(),
+            'contact': self.customer_table_view.item(self.selected_row, 2).text(),
+            'address': self.customer_table_view.item(self.selected_row, 3).text(),
+            'notes': '',
+            'type': 'Regular',
         }
-        
         dialog = CustomerDialog(self, cust)
         if dialog.exec_():
             data = dialog.get_data()
-            # TODO: Update in model/controller
+            self.controller.update_customer(
+                customer_id,
+                name=data['name'],
+                contact=data['contact'],
+                address=data['address'],
+                history=data.get('notes', '')
+            )
             QMessageBox.information(self, "Customer Updated", f"Customer {data['name']} updated.")
             self.refresh_table()
 
@@ -827,11 +785,11 @@ class CustomerView(QWidget):
         if self.selected_row is None:
             show_error(self, "Select a customer to delete.", title="No Selection")
             return
-            
-        name = self.table.item(self.selected_row, 1).text()
+        customer_id = int(self.customer_table_view.item(self.selected_row, 0).text())
+        name = self.customer_table_view.item(self.selected_row, 1).text()
         if QMessageBox.question(self, "Delete Customer", f"Delete customer {name}?", 
                                QMessageBox.Yes|QMessageBox.No) == QMessageBox.Yes:
-            # TODO: Delete from model/controller
+            self.controller.delete_customer(customer_id)
             QMessageBox.information(self, "Customer Deleted", f"Customer {name} deleted.")
             self.refresh_table()
     
@@ -839,7 +797,36 @@ class CustomerView(QWidget):
         dialog = BillingDialog(self)
         if dialog.exec_():
             data = dialog.get_billing_data()
-            # TODO: Save to model/controller
+            # Save purchases to database
+            if not self.purchases_controller or not self.controller:
+                QMessageBox.warning(self, "Error", "Purchases controller or customer controller not set.")
+                return
+            customer = self.controller.get_customer_by_name(data['customer_name'])
+            if not customer:
+                QMessageBox.warning(self, "Error", f"Customer '{data['customer_name']}' not found.")
+                return
+            customer_id = customer[0]
+            for product in data['products']:
+                try:
+                    quantity = int(product.get('quantity', '1'))
+                except Exception:
+                    quantity = 1
+                try:
+                    price = float(product.get('unit_price', '0'))
+                except Exception:
+                    price = 0.0
+                try:
+                    total = float(product.get('total_price', '0'))
+                except Exception:
+                    total = 0.0
+                self.purchases_controller.add_purchase(
+                    customer_id=customer_id,
+                    product=product.get('product', ''),
+                    quantity=quantity,
+                    price=price,
+                    total=total,
+                    date=data['date']
+                )
             QMessageBox.information(self, "Billing Added", f"Invoice {data['invoice_number']} added.")
             self.refresh_table()
     
@@ -850,7 +837,7 @@ class CustomerView(QWidget):
             
         # Create customer info dictionary from selected row
         customer = {
-            'name': self.table.item(self.selected_row, 1).text(),
+            'name': self.customer_table_view.item(self.selected_row, 1).text(),
             'address': ''  # We don't have this in the table, would come from database
         }
         
@@ -896,6 +883,7 @@ class CustomerView(QWidget):
         self.invoice_payment.clear()
         self.invoice_due.clear()
         self.selected_row = None
+        self.refresh_history_table()
 
     def refresh_data(self):
         """Refresh all customer data to ensure real-time updates"""
@@ -910,3 +898,48 @@ class CustomerView(QWidget):
             self.update_summary_cards()
             
         return True 
+
+    def set_purchases_controller(self, purchases_controller):
+        self.purchases_controller = purchases_controller
+        self.refresh_history_table()
+
+    def refresh_history_table(self):
+        self.history_table.setRowCount(0)
+        if not self.purchases_controller:
+            return
+        # Filter by selected customer if any
+        if self.selected_row is not None and self.customer_table_view.rowCount() > 0:
+            customer_id = int(self.customer_table_view.item(self.selected_row, 0).text())
+            purchases = self.purchases_controller.get_purchases_by_customer(customer_id)
+        else:
+            purchases = self.purchases_controller.get_all_purchases()
+        self.history_table.setRowCount(len(purchases))
+        for row, purchase in enumerate(purchases):
+            # purchase: (id, customer_name, product, quantity, price, total, date)
+            self.history_table.setItem(row, 0, QTableWidgetItem(str(purchase[0])))  # Order Number (id)
+            self.history_table.setItem(row, 1, QTableWidgetItem(purchase[6]))       # Date
+            self.history_table.setItem(row, 2, QTableWidgetItem(purchase[1]))       # Name
+            self.history_table.setItem(row, 3, QTableWidgetItem(purchase[2]))       # Product (as Address placeholder)
+            self.history_table.setItem(row, 4, QTableWidgetItem(str(purchase[3])))  # Contact (as Quantity placeholder) 
+
+    def update_card_value(self, key, value=None, description=None):
+        if key in self.card_labels:
+            if value is not None:
+                self.card_labels[key]["value"].setText(str(value))
+            if description is not None:
+                self.card_labels[key]["desc"].setText(description)
+
+    def setup_auto_refresh(self):
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.timeout.connect(self.refresh_card_data)
+        self.refresh_timer.start(5000)  # every 5 seconds
+
+    def refresh_card_data(self):
+        # Replace with real data fetching logic
+        from random import randint
+        self.update_card_value("total", randint(100, 200), "Updated now")
+        self.update_card_value("active", randint(2, 10))
+        self.update_card_value("revenue", f"${randint(1000, 5000)}", "Live update")
+        self.update_card_value("avg_order", f"${randint(50, 200)}", "Avg per order")
+
+CustomerView = CustomerManagementView 

@@ -1,9 +1,11 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from app.utils.logger import logger
+from app.utils.logger import Logger
 from app.utils.database import DatabaseManager
 from app.core.event_system import EventSystem, EventTypes
 from app.models.base import User, UserCreate, UserUpdate
+
+logger = Logger()
 
 class UserManager:
     def __init__(self, event_system: EventSystem):

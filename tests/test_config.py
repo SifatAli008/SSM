@@ -70,7 +70,8 @@ class TestConfigManager:
         
         # Reset configuration
         config_manager.reset_to_default()
-        assert config_manager.get("app.name") == test_config["app"]["name"]
+        # After reset, expect the default value
+        assert config_manager.get("app.name") == "Smart Shop Manager"
     
     def test_config_persistence(self, config_manager, temp_dir):
         """Test configuration persistence to file."""

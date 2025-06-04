@@ -28,3 +28,6 @@ class CustomerController:
         if result:
             global_event_system.notify_customer_update()
         return result
+
+    def get_customer_by_name(self, name):
+        return self.model.get_customer_by_name(name)

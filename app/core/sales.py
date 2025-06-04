@@ -2,12 +2,14 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from decimal import Decimal
 from sqlalchemy import func, desc
-from app.utils.logger import logger
+from app.utils.logger import Logger
 from app.utils.database import DatabaseManager
 from app.core.event_system import EventSystem, EventTypes
 from app.models.base import Sale, SaleCreate, SaleUpdate, SaleItem, SaleItemCreate, Product
 from app.ui.firebase_utils import get_db
 import random
+
+logger = Logger()
 
 class SalesManager:
     def __init__(self, event_system: EventSystem):

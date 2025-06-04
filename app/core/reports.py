@@ -7,11 +7,13 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
-from app.utils.logger import logger
+from app.utils.logger import Logger
 from app.utils.config_manager import config_manager
 from app.utils.database import db_manager
 from app.core.event_system import EventSystem, EventTypes
 from app.ui.firebase_utils import get_db
+
+logger = Logger()
 
 class ReportManager:
     def __init__(self, event_system: EventSystem):

@@ -119,6 +119,8 @@ def test_db(temp_dir):
 def db_connection(test_db):
     """Create a database connection for each test."""
     conn = sqlite3.connect(test_db)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     yield conn
     conn.close()
 

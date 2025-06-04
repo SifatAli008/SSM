@@ -5,9 +5,10 @@ from datetime import datetime
 from pathlib import Path
 import zipfile
 import json
-from app.utils.logger import logger
+from app.utils.logger import Logger
 from app.utils.database import DatabaseManager
 
+logger = Logger()
 
 class BackupManager:
     """Utility class for managing database backups"""

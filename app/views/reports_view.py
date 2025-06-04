@@ -13,67 +13,10 @@ from app.utils.theme_manager import ThemeManager
 from app.views.widgets.components import Card, Button
 from app.views.widgets.layouts import TabsLayout
 from app.views.widgets.enhanced_graph import ChartWidget
-from app.views.widgets.card_widget import CardWidget
-import os
+from app.views.widgets.reusable_shop_info_card import ReusableShopInfoCard, ShopCardPresets
 from app.utils.ui_helpers import show_error
 
 logger = Logger()
-
-class ReportCard(Card):
-    """A styled card for displaying report information"""
-    def __init__(self, title, value=None, icon=None, color=None):
-        super().__init__(title)
-        self.setMinimumHeight(140)  # Increased for better spacing
-        
-        # Set responsive size policy
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        
-        # Create a layout for the content
-        content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(0, 10, 0, 0)
-        content_layout.setSpacing(8)
-        
-        # Add icon and value if provided
-        if icon:
-            title_with_icon = f"{icon} {title}"
-            self.title_label.setText(title_with_icon)
-            self.title_label.setFont(QFont(ThemeManager.FONTS["family"], 14, QFont.Bold))
-        
-        # Value display
-        if value:
-            self.value_label = QLabel(value)
-            self.value_label.setStyleSheet(f"color: {color if color else ThemeManager.get_color('primary')}; background-color: transparent; font-weight: bold;")
-            self.value_label.setFont(QFont(ThemeManager.FONTS["family"], 24, QFont.Bold))
-            self.value_label.setAlignment(Qt.AlignLeft)
-        else:
-            self.value_label = QLabel()
-            self.value_label.setStyleSheet(f"color: {color if color else ThemeManager.get_color('primary')}; background-color: transparent; font-weight: bold;")
-            self.value_label.setFont(QFont(ThemeManager.FONTS["family"], 24, QFont.Bold))
-            self.value_label.setAlignment(Qt.AlignLeft)
-        
-        content_layout.addWidget(self.value_label)
-        self.layout.addLayout(content_layout)
-    
-    def update_value(self, value):
-        """Update the value displayed in the card"""
-        self.value_label.setText(value)
-
-class DetailCard(Card):
-    """A responsive card for detailed metrics"""
-    def __init__(self, title, parent=None):
-        super().__init__(title, parent)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setMinimumHeight(160)  # Consistent height
-        
-        # Improve title styling
-        self.title_label.setFont(QFont(ThemeManager.FONTS["family"], 14, QFont.Bold))
-        
-        # Box shadow and hover effect
-        self.setStyleSheet(self.styleSheet() + f"""
-            QFrame#card:hover {{
-                border: 1px solid {ThemeManager.get_color('primary')};
-            }}
-        """)
 
 class SectionHeader(QWidget):
     """A styled header for report sections"""
@@ -125,12 +68,13 @@ class ReportsView(QWidget):
         self.init_ui()
         self.connect_signals()
         self.load_data()
+        self.setMinimumSize(1700, 1050)
     
     def init_ui(self):
         self.setWindowTitle("Reports & Analytics")
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(24)
+        main_layout.setContentsMargins(40, 40, 40, 40)
+        main_layout.setSpacing(32)
 
         # Page header
         header = QLabel("Reports & Analytics")
@@ -192,7 +136,6 @@ class ReportsView(QWidget):
             sales_data = self.controller.get_sales_summary(period)
             self.revenue_card.update_values(f"${sales_data.get('total_sales', 0):,.2f}")
             self.orders_card.update_values(f"{sales_data.get('total_orders', 0):,}")
-            self.avg_card.update_values(f"${sales_data.get('average_order', 0):,.2f}")
             # TODO: Set self.revenue_sub, self.orders_sub, self.avg_sub with real period-over-period change if available
             # Update charts with real data
             months, revenue_data = self.controller.get_monthly_sales()
@@ -330,27 +273,51 @@ class ReportsView(QWidget):
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setSpacing(20)
-        cards_row = QHBoxLayout()
-        cards_row.setSpacing(20)
-        # Card 1: Total Revenue
-        self.revenue_card = CardWidget("Total Revenue", "$0.00", icon="💰")
-        cards_row.addWidget(self.revenue_card)
-        # Card 2: Total Orders
-        self.orders_card = CardWidget("Total Orders", "0", icon="📦")
-        cards_row.addWidget(self.orders_card)
-        # Card 3: Avg Order Value
-        self.avg_card = CardWidget("Avg Order Value", "$0.00", icon="💵")
-        cards_row.addWidget(self.avg_card)
-        # Card 4: Active Customers
-        self.cust_card = CardWidget("Active Customers", "0", icon="👥")
-        cards_row.addWidget(self.cust_card)
-        # Card 5: Net Profit
-        self.profit_card = CardWidget("Net Profit", "$0.00", icon="💹")
-        cards_row.addWidget(self.profit_card)
-        # Card 6: Total Expenses
-        self.expenses_card = CardWidget("Total Expenses", "$0.00", icon="💸")
-        cards_row.addWidget(self.expenses_card)
-        layout.addLayout(cards_row)
+        # Initialize summary cards before adding to grid
+        self.revenue_card = ReusableShopInfoCard({
+            "title": "Total Revenue",
+            "icon": "💰",
+            "color": ThemeManager.get_color('primary')
+        })
+        self.revenue_card.value_label.setFont(QFont("Segoe UI", 36, QFont.Bold))
+        self.revenue_card.subtitle_label.setFont(QFont("Segoe UI", 13))
+        self.orders_card = ReusableShopInfoCard({
+            "title": "Total Orders",
+            "icon": "📦",
+            "color": ThemeManager.get_color('primary')
+        })
+        self.orders_card.value_label.setFont(QFont("Segoe UI", 36, QFont.Bold))
+        self.orders_card.subtitle_label.setFont(QFont("Segoe UI", 13))
+        self.profit_card = ReusableShopInfoCard({
+            "title": "Net Profit",
+            "icon": "💹",
+            "color": ThemeManager.get_color('primary')
+        })
+        self.profit_card.value_label.setFont(QFont("Segoe UI", 36, QFont.Bold))
+        self.profit_card.subtitle_label.setFont(QFont("Segoe UI", 13))
+        self.expenses_card = ReusableShopInfoCard({
+            "title": "Total Expenses",
+            "icon": "💸",
+            "color": ThemeManager.get_color('primary')
+        })
+        self.expenses_card.value_label.setFont(QFont("Segoe UI", 36, QFont.Bold))
+        self.expenses_card.subtitle_label.setFont(QFont("Segoe UI", 13))
+        # Use a grid layout for summary cards with even column stretch
+        cards = [
+            self.revenue_card,
+            self.orders_card,
+            self.profit_card,
+            self.expenses_card
+        ]
+        cards_grid = QGridLayout()
+        cards_grid.setSpacing(32)
+        for i, card in enumerate(cards):
+            row = i // 4
+            col = i % 4
+            card.setMaximumWidth(420)
+            cards_grid.addWidget(card, row, col)
+            cards_grid.setColumnStretch(col, 1)
+        layout.addLayout(cards_grid)
         # Add summary labels for total expenses and profit margin
         self.total_expenses_label = QLabel("Total Expenses: $0.00")
         self.profit_margin_label = QLabel("Profit Margin: 0.0%")
@@ -363,15 +330,19 @@ class ReportsView(QWidget):
         charts_row.setSpacing(20)
         self.revenue_trend = Card("Revenue Trend", parent=widget)
         self.revenue_trend.layout.setContentsMargins(16, 16, 16, 16)
+        self.revenue_trend.setMinimumHeight(420)
         self.revenue_chart = ChartWidget()
+        self.revenue_chart.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.revenue_trend.layout.addWidget(self.revenue_chart)
-        charts_row.addWidget(self.revenue_trend)
+        charts_row.addWidget(self.revenue_trend, 2)
         self.sales_by_cat = Card("Sales by Category", parent=widget)
         self.sales_by_cat.layout.setContentsMargins(16, 16, 16, 16)
+        self.sales_by_cat.setMinimumHeight(420)
         self.pie_chart = ChartWidget()
+        self.pie_chart.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.sales_by_cat.layout.addWidget(self.pie_chart)
-        charts_row.addWidget(self.sales_by_cat)
-        layout.addLayout(charts_row)
+        charts_row.addWidget(self.sales_by_cat, 2)
+        layout.addLayout(charts_row, stretch=2)
         return widget
 
     def _sales_tab(self):
@@ -464,7 +435,11 @@ class ReportsView(QWidget):
         subtitle.setStyleSheet("color: #888; font-size: 15px;")
         layout.addWidget(subtitle)
         # Add inventory summary card at the top
-        self.inventory_card = CardWidget("Inventory Value", "$0.00", icon="📦")
+        self.inventory_card = ReusableShopInfoCard({
+            "title": "Inventory Value",
+            "icon": "📦",
+            "color": ThemeManager.get_color('primary')
+        })
         layout.addWidget(self.inventory_card)
         # Add summary labels for stock value, total items, and low stock
         self.stock_value_label = QLabel("Stock Value: $0.00")
@@ -582,7 +557,7 @@ class ReportsView(QWidget):
             ("Customer Retention", "89%"),
             ("Avg Customer Value", "$432"),
             ("Avg Orders per Customer", "4.2")]):
-            card = CardWidget(title, value)
+            card = ReusableShopInfoCard({"title": title, "icon": "👥", "color": "#9b59b6"})
             card.setStyleSheet("background: #fff; border: none; border-radius: 12px; min-width: 160px; min-height: 80px; font-size: 15px;")
             grid.addWidget(card, i // 2, i % 2)
         right_layout.addStretch(1)

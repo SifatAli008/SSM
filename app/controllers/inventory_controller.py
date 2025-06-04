@@ -4,11 +4,25 @@ import os
 import csv
 import datetime
 from app.utils.database import DatabaseManager
-from app.utils.logger import logger
+from app.utils.logger import Logger
+logger = Logger()
 from app.utils.event_system import global_event_system
 from app.utils.cache_manager import global_cache
 from app.models.inventory import FirebaseInventoryTableModel
 from app.core.inventory import InventoryManager
+import attr
+
+@attr.s(auto_attribs=True)
+class Product:
+    name: str = ''
+    quantity: int = 0
+    price: float = 0.0
+    category: str = ''
+    details: str = ''
+    buying_price: float = 0.0
+    selling_price: float = 0.0
+    stock: int = 0
+    id: int = 0
 
 class InventoryController:
     def __init__(self, event_system=None):
@@ -21,13 +35,21 @@ class InventoryController:
         self.model.refresh()
 
     def add_product(self, *args, **kwargs):
-        if args and not kwargs:
-            # Assume args: name, quantity, price, category
-            keys = ["name", "quantity", "price", "category"]
-            kwargs = dict(zip(keys, args))
-        prod = type('Product', (), {})()
-        for k, v in kwargs.items():
-            setattr(prod, k, v)
+        # Only allow named arguments for clarity
+        if args:
+            raise ValueError("add_product only accepts named arguments (use name=..., quantity=..., etc.)")
+        name = kwargs.get('name', '').strip()
+        if not name:
+            logger.error("Product name is required and cannot be empty.")
+            raise ValueError("Product name is required.")
+        # Ensure 'quantity' and 'stock' are both set
+        if 'quantity' in kwargs:
+            kwargs['stock'] = kwargs.get('stock', kwargs['quantity'])
+        elif 'stock' in kwargs:
+            kwargs['quantity'] = kwargs.get('quantity', kwargs['stock'])
+        logger.info(f"Adding product with values: {kwargs}")
+        keys = ["name", "quantity", "price", "category", "details", "buying_price", "selling_price", "stock", "id"]
+        prod = Product(**{k: kwargs.get(k, getattr(Product, k, '')) for k in keys})
         self.products.append(prod)
         return prod
 
