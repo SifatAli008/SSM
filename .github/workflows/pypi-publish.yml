@@ -27,8 +27,15 @@ jobs:
         run: |
           python -m build
 
+      - name: Create firebase_key.json for tests
+        run: |
+          mkdir -p config
+          echo "${{ secrets.FIREBASE_KEY_JSON }}" > config/firebase_key.json
+
       - name: Publish package to PyPI
         # NOTE: The secret PYPI_API_TOKEN must be set in GitHub repository secrets for this step to work.
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_API_TOKEN }} 
+          password: ${{ secrets.PYPI_API_TOKEN }}
+    permissions:
+      id-token: write 
