@@ -5,7 +5,7 @@ import random
 from datetime import datetime, timedelta
 
 # Path to your service account key
-SERVICE_ACCOUNT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../config/firebase_key.json'))
+SERVICE_ACCOUNT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../config/firebase_key.json'))
 
 # Initialize the Firebase app
 if not firebase_admin._apps:
