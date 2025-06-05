@@ -42,8 +42,10 @@
 - [ ] User auth: Passwords are hashed, but check for secure password storage and never log sensitive info.
 
 #### G. CI/CD
-- [ ] No CI pipeline: No GitHub Actions or other CI config detected for automated testing on push/PR.
-- [ ] No deployment scripts: No scripts for packaging, releasing, or deploying the app.
+- [x] CI pipeline: GitHub Actions workflows added for automated testing, building, and publishing
+- [x] Deployment scripts: Added PyInstaller build configuration and PyPI publishing workflow
+- [x] Automated releases: Windows executable builds on release tags
+- [x] Package distribution: PyPI publishing workflow for Python package distribution
 
 #### H. Data Migration
 - [ ] No migration scripts: If you change your SQLAlchemy models, you'll need Alembic or similar for migrations.
@@ -54,7 +56,7 @@
 ## 2. Missing or Incomplete Features
 - [ ] Unified backend abstraction
 - [ ] Comprehensive test coverage for all business logic
-- [ ] CI/CD pipeline for automated testing and linting
+- [x] CI/CD pipeline for automated testing and linting
 - [ ] Accessibility and responsive design checks
 - [x] API documentation (README and user guide improved; auto-generated docs still missing)
 - [ ] Data migration and backup/restore tools for both SQL and Firebase
@@ -72,7 +74,7 @@
 - [x] Add `.gitignore` for secrets and generated files (now mentioned in README)
 
 ### Medium Term
-- [ ] Set up CI (GitHub Actions) for tests and linting
+- [x] Set up CI (GitHub Actions) for tests and linting
 - [ ] Add API docs and a contributing guide *(README improved; auto-generated docs still missing)*
 - [ ] Implement Alembic for SQL migrations
 - [ ] Add accessibility and responsive design checks
@@ -80,7 +82,7 @@
 ### Long Term
 - [ ] Consider a plugin system for backends (SQL, Firebase, REST, etc.)
 - [ ] Add data migration/sync tools
-- [ ] Explore packaging/distribution options (PyInstaller, etc.)
+- [x] Explore packaging/distribution options (PyInstaller, etc.)
 
 ---
 
